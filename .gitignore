@@ -1,0 +1,12 @@
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.pins
+*.xcodeproj
+
+# macOS
+.DS_Store
+
+# Editor
+*.swp
+.netrwhist
