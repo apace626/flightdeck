@@ -23,12 +23,15 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
     /// (the pty calls setsid), so killing the group (-pid) takes down make/java/etc.
     /// — not just the shell. Prevents orphaned servers holding ports after quit.
     func terminateProcessTree() {
+        // Only signal if the shell is still alive — shellPid is NOT reset on exit,
+        // so killing a dead (possibly reused) pid's group could hit siblings.
+        guard terminal.process.running else { return }
         let pid = terminal.process.shellPid
         guard pid > 0 else { return }
         killpg(pid, SIGTERM)
-        // Escalate to SIGKILL shortly after, for anything ignoring SIGTERM.
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
-            killpg(pid, SIGKILL)
+        // Escalate to SIGKILL shortly after, only if it's still running.
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            if self?.terminal.process.running == true { killpg(pid, SIGKILL) }
         }
     }
 

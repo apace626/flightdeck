@@ -43,7 +43,10 @@ enum FilesBrowser {
       out=$(fd --type f --hidden --follow --strip-cwd-prefix \
                 --exclude .git --exclude node_modules --exclude Library \
             | fzf --print-query --query "$query" --prompt 'files ❯ ' \
-                  --preview 'bat --color=always --style=numbers --line-range :400 {} 2>/dev/null' \
+                  --preview 'f={}; case "$f" in \
+                      *.md|*.markdown) glow -s dark -w "${FZF_PREVIEW_COLUMNS:-100}" "$f" 2>/dev/null ;; \
+                      *) bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :400 "$f" 2>/dev/null ;; \
+                    esac' \
                   --preview-window 'right,60%' \
                   --header 'Enter: open · Esc: quit')
       rc=$?

@@ -196,15 +196,18 @@ final class Workspace: NSView {
         }
         split.removeArrangedSubview(pane)
         pane.removeFromSuperview()
+        // Intentionally do NOT collapse a single-child split: reparenting the
+        // survivor leaves its SwiftTerm view blank. A lone child fills the split.
+        refocusAfterMutation()
+    }
 
-        // Collapse a split left with a single child.
-        if split.arrangedSubviews.count == 1 {
-            let lone = split.arrangedSubviews[0]
-            split.removeArrangedSubview(lone)
-            lone.removeFromSuperview()
-            replaceInParent(split, with: lone)
+    /// Restore focus + force a redraw on the surviving pane after a layout change.
+    private func refocusAfterMutation() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self, let pane = self.allPanes().last else { return }
+            (pane as? TerminalPane)?.terminal.needsDisplay = true
+            pane.takeFocus()
         }
-        allPanes().last?.takeFocus()
     }
 
     private func replaceInParent(_ old: NSView, with new: NSView) {

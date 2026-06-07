@@ -23,6 +23,9 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     private var config: Config!
     private var projects: [String: Project] = [:]   // keyed by name
     private var control: ControlServer?
+    private let dictation = Dictation()
+    private var visualizer: VisualizerOverlay?
+    private var dictationKeyMonitor: Any?
 
     override func loadView() {
         let root = NSView(frame: NSRect(x: 0, y: 0, width: 1280, height: 800))
@@ -118,6 +121,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             showFinder()
         case .openProjects:
             showProjectPicker()
+        case .toggleMic:
+            toggleMic()
         case .goto(let name):
             // Projects take precedence over same-named destinations.
             if projects[name] != nil {
@@ -243,6 +248,47 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         tabBar.isHidden = zenMode
         if let window = view.window, window.styleMask.contains(.fullScreen) != zenMode {
             window.toggleFullScreen(nil)
+        }
+    }
+
+    // MARK: - Dictation (mic → text)
+
+    private func toggleMic() {
+        if dictation.running {
+            finishDictation(insert: true)
+            return
+        }
+        dictation.start { [weak self] ok in
+            guard let self, ok else {
+                FileHandle.standardError.write(Data("flightdeck: mic/speech permission denied\n".utf8))
+                return
+            }
+            let viz = VisualizerOverlay(frame: self.view.bounds)
+            self.view.addSubview(viz)
+            self.visualizer = viz
+            self.dictation.onLevel = { [weak viz] level in viz?.push(level: level) }
+            self.dictation.onPartial = { [weak viz] text in viz?.setTranscript(text) }
+
+            // While listening: ⏎ inserts, esc cancels.
+            self.dictationKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+                switch event.keyCode {
+                case 36, 76: self?.finishDictation(insert: true); return nil   // return / enter
+                case 53:     self?.finishDictation(insert: false); return nil  // escape
+                default:     return event
+                }
+            }
+        }
+    }
+
+    private func finishDictation(insert: Bool) {
+        let text = dictation.stop()
+        if let monitor = dictationKeyMonitor { NSEvent.removeMonitor(monitor); dictationKeyMonitor = nil }
+        visualizer?.removeFromSuperview(); visualizer = nil
+
+        guard insert, !text.isEmpty else { return }
+        // Send the transcript into the focused terminal pane (as if typed).
+        if let term = activeWorkspace?.focusedPane() as? TerminalPane {
+            term.terminal.send(txt: text)
         }
     }
 

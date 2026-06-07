@@ -10,3 +10,7 @@ Package.pins
 # Editor
 *.swp
 .netrwhist
+
+# Built app bundle
+Flightdeck.app/
+Resources/AppIcon.icns

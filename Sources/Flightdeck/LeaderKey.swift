@@ -4,6 +4,7 @@ enum LeaderAction {
     case newTerminalTab
     case openFinder
     case openProjects          // project picker (leader+p)
+    case toggleMic             // mic visualizer (leader+m)
     case goto(String)          // destination or project name
     case splitRight
     case splitDown
@@ -91,6 +92,7 @@ final class LeaderController {
         case "t": return .newTerminalTab
         case "o": return .openFinder
         case "p": return .openProjects
+        case "m": return .toggleMic
         case "/": return .splitRight
         case "-": return .splitDown
         case "h": return .focus(.left)
@@ -121,7 +123,7 @@ final class LeaderController {
     private func showHUD() {
         guard let host = hostView, hud == nil else { return }
 
-        var parts = ["t new tab", "o find file", "p projects"]
+        var parts = ["t new tab", "o find file", "p projects", "m mic"]
         parts += destinations.map { "\($0.key) \($0.title.lowercased())" }
         parts += ["/ split →", "- split ↓", "h j k l focus", "x close", "1-9 tab", "z zen", "? pin", "esc cancel"]
         let bindings = parts.joined(separator: "    ")
