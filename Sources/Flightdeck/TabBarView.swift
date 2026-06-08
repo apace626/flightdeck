@@ -3,6 +3,7 @@ import AppKit
 /// Minimal top tab strip. Phase 0: text buttons, active tab highlighted.
 final class TabBarView: NSView {
     var onSelect: ((Int) -> Void)?
+    var onNewTab: (() -> Void)?
 
     private let stack = NSStackView()
     private var titles: [String] = []
@@ -51,9 +52,22 @@ final class TabBarView: NSView {
             button.font = NSFont.systemFont(ofSize: 12, weight: isActive ? .semibold : .regular)
             stack.addArrangedSubview(button)
         }
+
+        // Trailing "+" to open a new tab.
+        let plus = NSButton(title: " + ", target: self, action: #selector(newTabClicked))
+        plus.isBordered = false
+        plus.wantsLayer = true
+        plus.layer?.cornerRadius = 5
+        plus.contentTintColor = .lightGray
+        plus.font = NSFont.systemFont(ofSize: 14, weight: .medium)
+        stack.addArrangedSubview(plus)
     }
 
     @objc private func tabClicked(_ sender: NSButton) {
         onSelect?(sender.tag)
+    }
+
+    @objc private func newTabClicked() {
+        onNewTab?()
     }
 }

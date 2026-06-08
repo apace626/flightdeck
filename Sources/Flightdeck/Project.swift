@@ -40,6 +40,16 @@ private struct RawProjectFile: Codable {
     var commands: [String: Command]?
 }
 
+/// One project entry in a central `projects.toml` (keyed by project name).
+private struct RawCentralProject: Codable {
+    var name: String?
+    var root: String?
+    var key: String?
+    var env: [String: String]?
+    var layout: RawLayout?
+    var commands: [String: RawProjectFile.Command]?
+}
+
 /// A layout node: either a leaf (`run`/`web`) or a split (`split` + `panes`).
 private struct RawLayout: Codable {
     var split: String?          // "row" → side by side · "col"/"column" → stacked
@@ -76,6 +86,37 @@ enum ProjectLoader {
             }
         }
         return found.sorted { $0.name.lowercased() < $1.name.lowercased() }
+    }
+
+    /// Load a central `projects.toml` — `[name]` tables each with an explicit
+    /// `root` + layout/env/commands. Lets you define projects you don't own
+    /// without dropping a file in their repo.
+    static func loadCentral(_ path: String) -> [Project] {
+        guard FileManager.default.fileExists(atPath: path) else { return [] }
+        do {
+            let text = try String(contentsOfFile: path, encoding: .utf8)
+            let raws = try TOMLDecoder().decode([String: RawCentralProject].self, from: try TOMLTable(string: text))
+            var projects: [Project] = []
+            for (key, raw) in raws {
+                guard let rootRaw = raw.root else {
+                    FileHandle.standardError.write(Data("flightdeck: project \"\(key)\" in projects.toml has no root\n".utf8))
+                    continue
+                }
+                let root = expand(rootRaw, relativeTo: NSHomeDirectory())
+                let env = raw.env ?? [:]
+                let layout = raw.layout.map { build($0, root: root, env: env) }
+                    ?? .terminal(command: nil, cwd: root, env: env)
+                let commands: [ProjectCommand] = (raw.commands ?? [:]).map { ckey, cmd in
+                    ProjectCommand(key: cmd.key?.first, name: ckey, run: cmd.run, target: target(cmd.in))
+                }
+                projects.append(Project(name: raw.name ?? key, key: raw.key?.first,
+                                        root: root, env: env, layout: layout, commands: commands))
+            }
+            return projects.sorted { $0.name.lowercased() < $1.name.lowercased() }
+        } catch {
+            FileHandle.standardError.write(Data("flightdeck: bad projects.toml: \(error)\n".utf8))
+            return []
+        }
     }
 
     static func load(path: String) -> Project? {

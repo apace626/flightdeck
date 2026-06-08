@@ -6,6 +6,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         var title: String
         let destination: String? // nil = anonymous terminal tab
         let workspace: Workspace
+        var pinnedTitle = false  // manually renamed → don't auto-retitle from shell
 
         init(title: String, destination: String?, workspace: Workspace) {
             self.title = title
@@ -76,8 +77,16 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         tabBar.onSelect = { [weak self] index in
             self?.selectTab(index)
         }
+        tabBar.onNewTab = { [weak self] in
+            self?.addTerminalTab()
+        }
 
-        // Discover projects from flightdeck.toml files under the scan roots.
+        // Discover projects: central projects.toml first, then in-repo
+        // flightdeck.toml files (which win on a name collision).
+        let centralPath = ConfigLoader.configDir.appendingPathComponent("projects.toml").path
+        for project in ProjectLoader.loadCentral(centralPath) {
+            projects[project.name] = project
+        }
         for project in ProjectLoader.scan(config.projectScanRoots) {
             projects[project.name] = project
         }
@@ -123,6 +132,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             showProjectPicker()
         case .toggleMic:
             toggleMic()
+        case .renameTab:
+            renameActiveTab()
         case .goto(let name):
             // Projects take precedence over same-named destinations.
             if projects[name] != nil {
@@ -155,7 +166,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     private func addTerminalTab(select: Bool = true) {
         let workspace = Workspace()
         workspace.delegate = self
-        tabs.append(Tab(title: "Term", destination: nil, workspace: workspace))
+        tabs.append(Tab(title: "New Tab", destination: nil, workspace: workspace))
         if select {
             selectTab(tabs.count - 1)
         } else {
@@ -249,6 +260,25 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         if let window = view.window, window.styleMask.contains(.fullScreen) != zenMode {
             window.toggleFullScreen(nil)
         }
+    }
+
+    // MARK: - Rename tab
+
+    private func renameActiveTab() {
+        guard tabs.indices.contains(activeIndex),
+              !view.subviews.contains(where: { $0 is TextPrompt }) else { return }
+        let current = tabs[activeIndex].title
+        let prompt = TextPrompt(frame: view.bounds, title: "Rename tab", initial: current)
+        prompt.onSubmit = { [weak self] name in
+            guard let self, self.tabs.indices.contains(self.activeIndex) else { return }
+            self.tabs[self.activeIndex].title = name
+            self.tabs[self.activeIndex].pinnedTitle = true
+            self.refreshTabBar()
+            self.activeWorkspace?.focusInitial()
+        }
+        prompt.onClose = { [weak self] in self?.activeWorkspace?.focusInitial() }
+        view.addSubview(prompt)
+        prompt.focusField()
     }
 
     // MARK: - Dictation (mic → text)
@@ -370,7 +400,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
 
     func workspace(_ workspace: Workspace, paneTitleChanged title: String) {
         guard let index = tabs.firstIndex(where: { $0.workspace === workspace }),
-              tabs[index].destination == nil, !title.isEmpty else { return }
+              tabs[index].destination == nil, !tabs[index].pinnedTitle, !title.isEmpty else { return }
         tabs[index].title = title
         refreshTabBar()
     }
