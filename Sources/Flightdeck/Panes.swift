@@ -130,7 +130,11 @@ final class WebPane: PaneView {
         webView.frame = bounds
         webView.autoresizingMask = [.width, .height]
         addSubview(webView)
-        webView.load(URLRequest(url: url))
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            webView.load(URLRequest(url: url))
+        }
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }

@@ -8,6 +8,7 @@ enum FilesBrowser {
         install("ff", ffScript)
         install("lg", lgScript)
         install("fd-open", fdOpenScript)
+        install("fd-md", fdMdScript)
     }
 
     // Boxed (--style=full) fzf themed to Catppuccin Mocha. Prepended to ff/lg.
@@ -48,7 +49,8 @@ enum FilesBrowser {
                       *) bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :400 "$f" 2>/dev/null ;; \
                     esac' \
                   --preview-window 'right,60%' \
-                  --header 'Enter: open · Esc: quit')
+                  --bind 'ctrl-g:execute-silent(fd-md {})' \
+                  --header 'Enter: open · ^G: preview md · Esc: quit')
       rc=$?
       query=$(printf '%s' "$out" | sed -n '1p')
       file=$(printf '%s' "$out" | sed -n '2p')
@@ -80,6 +82,49 @@ enum FilesBrowser {
       printf "tab\\t%s\\tnvim '%s'\\n" "$title" "$file" | nc -U "$SOCK"
     else
       "${EDITOR:-nvim}" "$file"
+    fi
+    """
+
+    // fd-md <file> — render markdown to styled HTML (pandoc) and open in a web
+    // tab — a VSCode-style preview (real headings, syntax-highlighted code, CSS).
+    private static let fdMdScript = """
+    #!/bin/sh
+    # fd-md <file> — VSCode-style markdown preview in a Flightdeck web tab.
+    SOCK="$HOME/.config/flightdeck/control.sock"
+    CSS="$HOME/.config/flightdeck/md-preview.css"
+    file="$1"
+    [ -z "$file" ] && exit 0
+    case "$file" in /*) ;; *) file="$PWD/$file" ;; esac
+
+    if [ ! -f "$CSS" ]; then
+    cat > "$CSS" <<'CSS'
+    :root { color-scheme: dark; }
+    body { background:#1e1e2e; color:#cdd6f4; font:16px/1.7 -apple-system,system-ui,sans-serif; max-width:820px; margin:0 auto; padding:48px 40px; }
+    h1,h2,h3,h4 { color:#cba6f7; font-weight:700; line-height:1.25; margin:1.6em 0 .6em; }
+    h1 { font-size:2em; color:#f5e0dc; border-bottom:1px solid #313244; padding-bottom:.3em; }
+    h2 { font-size:1.5em; border-bottom:1px solid #313244; padding-bottom:.3em; }
+    h3 { font-size:1.25em; color:#89b4fa; }
+    a { color:#89b4fa; }
+    code { background:#313244; color:#f5c2e7; padding:.15em .4em; border-radius:5px; font:.9em ui-monospace,"SF Mono",monospace; }
+    pre { background:#181825; padding:16px; border-radius:10px; overflow:auto; border:1px solid #313244; }
+    pre code { background:none; color:inherit; padding:0; }
+    blockquote { border-left:3px solid #cba6f7; margin:1em 0; padding:.2em 1em; color:#a6adc8; }
+    table { border-collapse:collapse; }
+    th,td { border:1px solid #313244; padding:6px 12px; }
+    hr { border:none; border-top:1px solid #313244; }
+    img { max-width:100%; }
+    ul,ol { padding-left:1.4em; }
+    CSS
+    fi
+
+    out="${TMPDIR:-/tmp}/fd-md-$(basename "$file" .md).html"
+    pandoc -s --embed-resources --highlight-style=breezedark -c "$CSS" \
+           --metadata title="$(basename "$file")" "$file" -o "$out" 2>/dev/null
+    title="◆ $(basename "$file")"
+    if [ -S "$SOCK" ] && [ -f "$out" ] && command -v nc >/dev/null 2>&1; then
+      printf "web\\t%s\\tfile://%s\\n" "$title" "$out" | nc -U "$SOCK"
+    else
+      open "$out" 2>/dev/null || glow -p "$file"
     fi
     """
 

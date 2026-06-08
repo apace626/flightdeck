@@ -359,6 +359,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         switch parts.first {
         case "tab" where parts.count >= 3:
             openCommandTab(title: parts[1], command: parts[2])
+        case "web" where parts.count >= 3:
+            if let url = URL(string: parts[2]) { openWebTab(title: parts[1], url: url) }
         case "goto" where parts.count >= 2:
             if projects[parts[1]] != nil { openProject(parts[1]) }
             else { openDestination(parts[1]) }
@@ -370,6 +372,14 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     /// Open a new tab running an arbitrary command (used by the control socket).
     func openCommandTab(title: String, command: String) {
         let workspace = Workspace(initialPane: TerminalPane(command: command))
+        workspace.delegate = self
+        tabs.append(Tab(title: title, destination: nil, workspace: workspace))
+        selectTab(tabs.count - 1)
+    }
+
+    /// Open a new web tab at a URL (used by the control socket — e.g. md preview).
+    func openWebTab(title: String, url: URL) {
+        let workspace = Workspace(initialPane: WebPane(url: url))
         workspace.delegate = self
         tabs.append(Tab(title: title, destination: nil, workspace: workspace))
         selectTab(tabs.count - 1)
