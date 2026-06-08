@@ -96,14 +96,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             projects[project.name] = project
         }
 
-        // Leader bindings: config destinations + keyed projects.
-        var bindings = config.orderedDestinations.compactMap { dest in
-            dest.key.map { DestinationBinding(key: $0, name: dest.name, title: dest.title) }
-        }
-        bindings += projects.values.compactMap { project in
-            project.key.map { DestinationBinding(key: $0, name: project.name, title: project.name) }
-        }
-        leader = LeaderController(hostView: view, destinations: bindings) { [weak self] action in
+        // Ctrl+Space opens the searchable launcher (all destinations/projects/actions).
+        leader = LeaderController(hostView: view) { [weak self] action in
             self?.perform(action)
         }
 
@@ -156,10 +150,10 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         switch action {
         case .newTerminalTab:
             addTerminalTab()
+        case .openLauncher:
+            showLauncher()
         case .openFinder:
             showFinder()
-        case .openProjects:
-            showProjectPicker()
         case .toggleMic:
             toggleMic()
         case .renameTab:
@@ -402,23 +396,65 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         if select { selectTab(tabs.count - 1) } else { refreshTabBar() }
     }
 
-    private func showProjectPicker() {
+    // MARK: - Launcher (Ctrl+Space) — search destinations, projects, actions
+
+    private func showLauncher() {
         guard !view.subviews.contains(where: { $0 is ListPicker }) else { return }
-        let items = projects.values
-            .sorted { $0.name.lowercased() < $1.name.lowercased() }
-            .map { p in
-                ListPicker.Item(
-                    id: p.name,
-                    title: p.name,
-                    subtitle: (p.root as NSString).abbreviatingWithTildeInPath,
-                    keyHint: p.key.map(String.init)
-                )
-            }
-        let picker = ListPicker(frame: view.bounds, placeholder: "Open project…", items: items)
-        picker.onSelect = { [weak self] name in self?.openProject(name) }
+        var items: [ListPicker.Item] = []
+
+        // Destinations (config order) — the "apps" you go to.
+        for d in config.orderedDestinations {
+            items.append(.init(id: "go:\(d.name)", title: d.title,
+                               subtitle: destSubtitle(d), keyHint: d.key.map(String.init)))
+        }
+        // Projects.
+        for p in projects.values.sorted(by: { $0.name.lowercased() < $1.name.lowercased() }) {
+            items.append(.init(id: "go:\(p.name)", title: p.name,
+                               subtitle: (p.root as NSString).abbreviatingWithTildeInPath,
+                               keyHint: p.key.map(String.init)))
+        }
+        // Actions.
+        items += [
+            .init(id: "act:newtab", title: "New Terminal Tab", subtitle: "blank shell",      keyHint: nil),
+            .init(id: "act:finder", title: "Find File…",       subtitle: "fuzzy file finder", keyHint: nil),
+            .init(id: "act:rename", title: "Rename Tab",       subtitle: "current tab",       keyHint: nil),
+            .init(id: "act:splitr", title: "Split Right",      subtitle: "pane",              keyHint: nil),
+            .init(id: "act:splitd", title: "Split Down",       subtitle: "pane",              keyHint: nil),
+            .init(id: "act:close",  title: "Close Pane",       subtitle: "",                  keyHint: nil),
+            .init(id: "act:zen",    title: "Zen Mode",         subtitle: "fullscreen",        keyHint: nil),
+            .init(id: "act:mic",    title: "Dictate",          subtitle: "voice → text",      keyHint: nil),
+        ]
+
+        let picker = ListPicker(frame: view.bounds,
+                                placeholder: "Search destinations, projects, actions…", items: items)
+        picker.onSelect = { [weak self] id in self?.launch(id) }
         picker.onClose = { [weak self] in self?.activeWorkspace?.focusInitial() }
         view.addSubview(picker)
         picker.focusField()
+    }
+
+    private func launch(_ id: String) {
+        if id.hasPrefix("go:") { perform(.goto(String(id.dropFirst(3)))); return }
+        switch id {
+        case "act:newtab": perform(.newTerminalTab)
+        case "act:finder": perform(.openFinder)
+        case "act:rename": perform(.renameTab)
+        case "act:splitr": perform(.splitRight)
+        case "act:splitd": perform(.splitDown)
+        case "act:close":  perform(.closePane)
+        case "act:zen":    perform(.toggleZen)
+        case "act:mic":    perform(.toggleMic)
+        default: break
+        }
+    }
+
+    private func destSubtitle(_ d: Destination) -> String {
+        switch d.kind {
+        case .web:       return d.url?.absoluteString ?? "web app"
+        case .terminal:  return d.command ?? "terminal"
+        case .dashboard: return "dashboard"
+        case .files:     return "file finder"
+        }
     }
 
     // MARK: - Fuzzy finder
