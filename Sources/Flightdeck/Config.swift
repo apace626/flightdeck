@@ -5,7 +5,7 @@ import TOMLKit
 
 struct Destination {
     enum Kind: String {
-        case terminal, web, dashboard, files, tasks
+        case terminal, web, dashboard, files
     }
 
     let name: String        // config key, e.g. "chatgpt"
@@ -192,12 +192,6 @@ type = "terminal"
 title = "Braindump"
 command = "cd ~/sync/braindump && ff; exec ${SHELL:-/bin/zsh} -l"
 key = "b"
-
-[destinations.tasks]
-# taskwarrior-tui (manage) + a live summary pane.
-type = "tasks"
-title = "Tasks"
-key = "a"
 
 [destinations.scratchpad]
 # A throwaway empty Neovim buffer for quick notes.

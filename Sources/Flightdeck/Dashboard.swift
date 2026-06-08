@@ -47,7 +47,7 @@ enum Dashboard {
 
     e=$(printf '\\033')
     dim="$e[2m"; bold="$e[1m"; cyan="$e[1;36m"; white="$e[1;37m"; ylw="$e[1;33m"; grn="$e[1;32m"; red="$e[1;31m"; rst="$e[0m"
-    DEPS="nvim git fzf fd bat pandoc lazygit task taskwarrior-tui"
+    DEPS="nvim git fzf fd bat pandoc lazygit"
 
     ip4=""; pubip=""; city=""; net_t=0
     sys=""; dev=""; tools=""; slow_t=0
