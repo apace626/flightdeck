@@ -217,6 +217,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         switch dest.kind {
         case .dashboard:
             workspace = Workspace(spec: Dashboard.spec())
+        case .tasks:
+            workspace = Workspace(spec: Tasks.spec())
         case .files:
             let finder = FinderOverlay(frame: .zero, roots: config.finderRoots, style: .embedded)
             finder.delegate = self

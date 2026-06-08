@@ -5,7 +5,7 @@ import TOMLKit
 
 struct Destination {
     enum Kind: String {
-        case terminal, web, dashboard, files
+        case terminal, web, dashboard, files, tasks
     }
 
     let name: String        // config key, e.g. "chatgpt"
@@ -185,6 +185,12 @@ roots = ["~/Projects", "~/Downloads", "~/Documents", "~/Desktop"]
 type = "terminal"
 title = "Files"
 key = "f"
+
+[destinations.tasks]
+# taskwarrior-tui (manage) + a live summary pane.
+type = "tasks"
+title = "Tasks"
+key = "a"
 
 [destinations.scratchpad]
 # A throwaway empty Neovim buffer for quick notes.

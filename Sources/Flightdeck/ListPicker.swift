@@ -1,7 +1,7 @@
 import AppKit
 
-/// A lightweight fuzzy list overlay — pick one of N items. Reused for the project
-/// picker (leader+p) and, later, the command palette. No preview pane.
+/// A modern command-palette-style fuzzy picker (Catppuccin themed). Used for the
+/// project picker (leader+p); reusable for a future command palette.
 final class ListPicker: NSView, NSTextFieldDelegate, NSTableViewDataSource, NSTableViewDelegate {
     struct Item {
         let id: String
@@ -18,33 +18,77 @@ final class ListPicker: NSView, NSTextFieldDelegate, NSTableViewDataSource, NSTa
     private let allItems: [Item]
     private var matches: [Item] = []
 
+    // Catppuccin Mocha
+    private static func col(_ r: Int, _ g: Int, _ b: Int, _ a: CGFloat = 1) -> NSColor {
+        NSColor(srgbRed: CGFloat(r) / 255, green: CGFloat(g) / 255, blue: CGFloat(b) / 255, alpha: a)
+    }
+    private static let base    = col(30, 30, 46)
+    private static let surface = col(49, 50, 68)
+    private static let surface1 = col(69, 71, 90)
+    private static let text    = col(205, 214, 244)
+    private static let subtext = col(166, 173, 200)
+    private static let mauve   = col(203, 166, 247)
+    private static let overlay = col(108, 112, 134)
+    private static let tileColors = [
+        col(137, 180, 250), col(166, 227, 161), col(243, 139, 168),
+        col(203, 166, 247), col(250, 179, 135), col(148, 226, 213),
+    ]
+
     init(frame: NSRect, placeholder: String, items: [Item]) {
         self.allItems = items
         super.init(frame: frame)
         autoresizingMask = [.width, .height]
         wantsLayer = true
-        layer?.backgroundColor = NSColor(calibratedWhite: 0, alpha: 0.55).cgColor
+        layer?.backgroundColor = NSColor(calibratedWhite: 0, alpha: 0.45).cgColor
 
-        let panel = NSVisualEffectView()
-        panel.material = .hudWindow
-        panel.state = .active
-        panel.blendingMode = .withinWindow
+        // Panel
+        let panel = NSView()
         panel.wantsLayer = true
-        panel.layer?.cornerRadius = 10
+        panel.layer?.backgroundColor = Self.base.cgColor
+        panel.layer?.cornerRadius = 16
+        panel.layer?.borderWidth = 1
+        panel.layer?.borderColor = Self.surface1.cgColor
+        panel.shadow = NSShadow()
+        panel.layer?.shadowColor = NSColor.black.cgColor
+        panel.layer?.shadowOpacity = 0.45
+        panel.layer?.shadowRadius = 30
+        panel.layer?.shadowOffset = CGSize(width: 0, height: -8)
         panel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(panel)
 
-        field.placeholderString = placeholder
-        field.font = NSFont.monospacedSystemFont(ofSize: 14, weight: .regular)
-        field.delegate = self
-        field.focusRingType = .none
-        field.translatesAutoresizingMaskIntoConstraints = false
+        // Search row: magnifier + field
+        let glyph = NSImageView()
+        glyph.image = NSImage(systemSymbolName: "magnifyingglass", accessibilityDescription: nil)
+        glyph.contentTintColor = Self.overlay
+        glyph.translatesAutoresizingMaskIntoConstraints = false
 
+        field.placeholderString = placeholder
+        field.font = .systemFont(ofSize: 17, weight: .regular)
+        field.textColor = Self.text
+        field.isBordered = false
+        field.drawsBackground = false
+        field.focusRingType = .none
+        field.delegate = self
+        field.translatesAutoresizingMaskIntoConstraints = false
+        if let cell = field.cell as? NSTextFieldCell {
+            cell.placeholderAttributedString = NSAttributedString(
+                string: placeholder,
+                attributes: [.foregroundColor: Self.overlay, .font: NSFont.systemFont(ofSize: 17)])
+        }
+
+        let divider = NSView()
+        divider.wantsLayer = true
+        divider.layer?.backgroundColor = Self.surface.cgColor
+        divider.translatesAutoresizingMaskIntoConstraints = false
+
+        // Table
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("item"))
         table.addTableColumn(column)
         table.headerView = nil
-        table.rowHeight = 40
+        table.rowHeight = 56
         table.backgroundColor = .clear
+        table.selectionHighlightStyle = .regular
+        table.intercellSpacing = NSSize(width: 0, height: 0)
         table.dataSource = self
         table.delegate = self
         table.doubleAction = #selector(rowDoubleClicked)
@@ -55,24 +99,38 @@ final class ListPicker: NSView, NSTextFieldDelegate, NSTableViewDataSource, NSTa
         scroll.hasVerticalScroller = true
         scroll.drawsBackground = false
         scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.automaticallyAdjustsContentInsets = false
+        scroll.contentInsets = NSEdgeInsets(top: 6, left: 0, bottom: 6, right: 0)
 
+        panel.addSubview(glyph)
         panel.addSubview(field)
+        panel.addSubview(divider)
         panel.addSubview(scroll)
 
         NSLayoutConstraint.activate([
             panel.centerXAnchor.constraint(equalTo: centerXAnchor),
             panel.centerYAnchor.constraint(equalTo: centerYAnchor, constant: -40),
-            panel.widthAnchor.constraint(equalToConstant: 560),
-            panel.heightAnchor.constraint(equalToConstant: 420),
+            panel.widthAnchor.constraint(equalToConstant: 600),
+            panel.heightAnchor.constraint(equalToConstant: 460),
 
-            field.topAnchor.constraint(equalTo: panel.topAnchor, constant: 14),
-            field.leadingAnchor.constraint(equalTo: panel.leadingAnchor, constant: 14),
-            field.trailingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -14),
+            glyph.leadingAnchor.constraint(equalTo: panel.leadingAnchor, constant: 20),
+            glyph.centerYAnchor.constraint(equalTo: field.centerYAnchor),
+            glyph.widthAnchor.constraint(equalToConstant: 18),
+            glyph.heightAnchor.constraint(equalToConstant: 18),
 
-            scroll.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 10),
+            field.topAnchor.constraint(equalTo: panel.topAnchor, constant: 18),
+            field.leadingAnchor.constraint(equalTo: glyph.trailingAnchor, constant: 12),
+            field.trailingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -20),
+
+            divider.topAnchor.constraint(equalTo: field.bottomAnchor, constant: 16),
+            divider.leadingAnchor.constraint(equalTo: panel.leadingAnchor),
+            divider.trailingAnchor.constraint(equalTo: panel.trailingAnchor),
+            divider.heightAnchor.constraint(equalToConstant: 1),
+
+            scroll.topAnchor.constraint(equalTo: divider.bottomAnchor),
             scroll.leadingAnchor.constraint(equalTo: panel.leadingAnchor, constant: 8),
             scroll.trailingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -8),
-            scroll.bottomAnchor.constraint(equalTo: panel.bottomAnchor, constant: -10),
+            scroll.bottomAnchor.constraint(equalTo: panel.bottomAnchor, constant: -8),
         ])
 
         refilter()
@@ -84,10 +142,7 @@ final class ListPicker: NSView, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 
     override func mouseDown(with event: NSEvent) { close() }
 
-    private func close() {
-        removeFromSuperview()
-        onClose?()
-    }
+    private func close() { removeFromSuperview(); onClose?() }
 
     // MARK: - Filtering
 
@@ -163,32 +218,122 @@ final class ListPicker: NSView, NSTextFieldDelegate, NSTableViewDataSource, NSTa
 
     func numberOfRows(in tableView: NSTableView) -> Int { matches.count }
 
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        PickerRowView()
+    }
+
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let item = matches[row]
-        let id = NSUserInterfaceItemIdentifier("cell")
-        let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? NSStackView) ?? {
-            let title = NSTextField(labelWithString: "")
-            title.identifier = NSUserInterfaceItemIdentifier("title")
-            title.font = NSFont.monospacedSystemFont(ofSize: 13, weight: .semibold)
-            title.textColor = .white
-            let sub = NSTextField(labelWithString: "")
-            sub.identifier = NSUserInterfaceItemIdentifier("sub")
-            sub.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .regular)
-            sub.textColor = .secondaryLabelColor
-            let stack = NSStackView(views: [title, sub])
-            stack.orientation = .vertical
-            stack.alignment = .leading
-            stack.spacing = 2
-            stack.identifier = id
-            stack.edgeInsets = NSEdgeInsets(top: 0, left: 8, bottom: 0, right: 8)
-            return stack
-        }()
-        if let title = cell.views.first(where: { $0.identifier?.rawValue == "title" }) as? NSTextField {
-            title.stringValue = item.keyHint.map { "[\($0)]  \(item.title)" } ?? item.title
-        }
-        if let sub = cell.views.first(where: { $0.identifier?.rawValue == "sub" }) as? NSTextField {
-            sub.stringValue = item.subtitle
-        }
+        let cell = (tableView.makeView(withIdentifier: PickerCell.id, owner: nil) as? PickerCell) ?? PickerCell()
+        cell.configure(item, tile: Self.tileColors[stableHash(item.title) % Self.tileColors.count],
+                       text: Self.text, subtext: Self.subtext, badgeBg: Self.surface1, badgeFg: Self.subtext)
         return cell
+    }
+
+    private func stableHash(_ s: String) -> Int {
+        var h = 0
+        for u in s.unicodeScalars { h = h &* 31 &+ Int(u.value) }
+        return abs(h)
+    }
+}
+
+/// Rounded, inset selection highlight (Catppuccin surface).
+private final class PickerRowView: NSTableRowView {
+    override func drawSelection(in dirtyRect: NSRect) {
+        guard isSelected else { return }
+        let r = bounds.insetBy(dx: 6, dy: 3)
+        NSColor(srgbRed: 49 / 255, green: 50 / 255, blue: 68 / 255, alpha: 1).setFill()
+        NSBezierPath(roundedRect: r, xRadius: 10, yRadius: 10).fill()
+    }
+}
+
+/// A picker row: colored initial tile + title/subtitle + optional key badge.
+private final class PickerCell: NSView {
+    static let id = NSUserInterfaceItemIdentifier("PickerCell")
+
+    private let tile = NSView()
+    private let initial = NSTextField(labelWithString: "")
+    private let title = NSTextField(labelWithString: "")
+    private let subtitle = NSTextField(labelWithString: "")
+    private let badge = NSView()
+    private let badgeLabel = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        identifier = Self.id
+
+        tile.wantsLayer = true
+        tile.layer?.cornerRadius = 9
+        tile.translatesAutoresizingMaskIntoConstraints = false
+        initial.font = .systemFont(ofSize: 16, weight: .bold)
+        initial.textColor = NSColor(srgbRed: 30 / 255, green: 30 / 255, blue: 46 / 255, alpha: 1)
+        initial.alignment = .center
+        initial.translatesAutoresizingMaskIntoConstraints = false
+        tile.addSubview(initial)
+
+        title.font = .systemFont(ofSize: 14, weight: .semibold)
+        title.translatesAutoresizingMaskIntoConstraints = false
+        subtitle.font = .monospacedSystemFont(ofSize: 11, weight: .regular)
+        subtitle.lineBreakMode = .byTruncatingMiddle
+        subtitle.translatesAutoresizingMaskIntoConstraints = false
+
+        badge.wantsLayer = true
+        badge.layer?.cornerRadius = 5
+        badge.translatesAutoresizingMaskIntoConstraints = false
+        badgeLabel.font = .monospacedSystemFont(ofSize: 11, weight: .semibold)
+        badgeLabel.alignment = .center
+        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
+        badge.addSubview(badgeLabel)
+
+        let texts = NSStackView(views: [title, subtitle])
+        texts.orientation = .vertical
+        texts.alignment = .leading
+        texts.spacing = 1
+        texts.translatesAutoresizingMaskIntoConstraints = false
+
+        addSubview(tile)
+        addSubview(texts)
+        addSubview(badge)
+
+        NSLayoutConstraint.activate([
+            tile.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 16),
+            tile.centerYAnchor.constraint(equalTo: centerYAnchor),
+            tile.widthAnchor.constraint(equalToConstant: 38),
+            tile.heightAnchor.constraint(equalToConstant: 38),
+            initial.centerXAnchor.constraint(equalTo: tile.centerXAnchor),
+            initial.centerYAnchor.constraint(equalTo: tile.centerYAnchor),
+
+            texts.leadingAnchor.constraint(equalTo: tile.trailingAnchor, constant: 14),
+            texts.centerYAnchor.constraint(equalTo: centerYAnchor),
+            texts.trailingAnchor.constraint(lessThanOrEqualTo: badge.leadingAnchor, constant: -12),
+
+            badge.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            badge.centerYAnchor.constraint(equalTo: centerYAnchor),
+            badge.heightAnchor.constraint(equalToConstant: 22),
+            badge.widthAnchor.constraint(greaterThanOrEqualToConstant: 22),
+            badgeLabel.leadingAnchor.constraint(equalTo: badge.leadingAnchor, constant: 7),
+            badgeLabel.trailingAnchor.constraint(equalTo: badge.trailingAnchor, constant: -7),
+            badgeLabel.centerYAnchor.constraint(equalTo: badge.centerYAnchor),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func configure(_ item: ListPicker.Item, tile tileColor: NSColor,
+                   text: NSColor, subtext: NSColor, badgeBg: NSColor, badgeFg: NSColor) {
+        tile.layer?.backgroundColor = tileColor.cgColor
+        initial.stringValue = String(item.title.prefix(1)).uppercased()
+        title.stringValue = item.title
+        title.textColor = text
+        subtitle.stringValue = item.subtitle
+        subtitle.textColor = subtext
+        if let key = item.keyHint {
+            badge.isHidden = false
+            badge.layer?.backgroundColor = badgeBg.cgColor
+            badgeLabel.stringValue = key
+            badgeLabel.textColor = badgeFg
+        } else {
+            badge.isHidden = true
+        }
     }
 }
