@@ -30,8 +30,7 @@ final class LeaderController {
     private let destinations: [DestinationBinding]
     private var monitor: Any?
     private var active = false
-    private var sticky = false // '?' keeps the HUD open
-    private var hud: NSView?
+    private var palette: LeaderPalette?
 
     private static let spaceKeyCode: UInt16 = 49
 
@@ -73,17 +72,8 @@ final class LeaderController {
             return
         }
 
-        if key == "?" {
-            sticky = true
-            return
-        }
-
         let action = builtinAction(for: key)
             ?? destinations.first { $0.key == key }.map { LeaderAction.goto($0.name) }
-
-        if sticky && action == nil {
-            return // unknown key while help is pinned: stay open
-        }
         deactivate()
         if let action { handler(action) }
     }
@@ -110,51 +100,49 @@ final class LeaderController {
 
     private func activate() {
         active = true
-        showHUD()
+        showPalette()
     }
 
     private func deactivate() {
         active = false
-        sticky = false
-        hud?.removeFromSuperview()
-        hud = nil
+        palette?.removeFromSuperview()
+        palette = nil
     }
 
-    // MARK: - Which-key HUD
+    // MARK: - Command palette
 
-    private func showHUD() {
-        guard let host = hostView, hud == nil else { return }
+    private func showPalette() {
+        guard let host = hostView, palette == nil else { return }
 
-        var parts = ["t new tab", "n name tab", "o find file", "p projects", "m mic"]
-        parts += destinations.map { "\($0.key) \($0.title.lowercased())" }
-        parts += ["/ split →", "- split ↓", "h j k l focus", "x close", "1-9 tab", "z zen", "? pin", "esc cancel"]
-        let bindings = parts.joined(separator: "    ")
+        // Destinations/projects (config-driven) form the "Go" group.
+        var go = destinations.map { LeaderPalette.Item(key: String($0.key), label: $0.title) }
+        go += [LeaderPalette.Item(key: "p", label: "Projects"),
+               LeaderPalette.Item(key: "o", label: "Find file")]
 
-        let label = NSTextField(labelWithString: bindings)
-        label.font = NSFont.monospacedSystemFont(ofSize: 12, weight: .medium)
-        label.textColor = .white
-        label.alignment = .center
-
-        let effect = NSVisualEffectView()
-        effect.material = .hudWindow
-        effect.state = .active
-        effect.blendingMode = .withinWindow
-        effect.wantsLayer = true
-        effect.layer?.cornerRadius = 8
-
-        label.translatesAutoresizingMaskIntoConstraints = false
-        effect.translatesAutoresizingMaskIntoConstraints = false
-        effect.addSubview(label)
-
-        host.addSubview(effect)
-        NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: effect.leadingAnchor, constant: 16),
-            label.trailingAnchor.constraint(equalTo: effect.trailingAnchor, constant: -16),
-            label.topAnchor.constraint(equalTo: effect.topAnchor, constant: 10),
-            label.bottomAnchor.constraint(equalTo: effect.bottomAnchor, constant: -10),
-            effect.centerXAnchor.constraint(equalTo: host.centerXAnchor),
-            effect.bottomAnchor.constraint(equalTo: host.bottomAnchor, constant: -24),
+        let panes = LeaderPalette.Group(title: "Panes", items: [
+            .init(key: "/", label: "Split right"),
+            .init(key: "-", label: "Split down"),
+            .init(key: "h j k l", label: "Focus"),
+            .init(key: "x", label: "Close pane"),
         ])
-        hud = effect
+        let tabs = LeaderPalette.Group(title: "Tabs", items: [
+            .init(key: "t", label: "New tab"),
+            .init(key: "n", label: "Name tab"),
+            .init(key: "1–9", label: "Switch tab"),
+        ])
+        let more = LeaderPalette.Group(title: "More", items: [
+            .init(key: "m", label: "Dictate"),
+            .init(key: "z", label: "Zen mode"),
+        ])
+
+        let columns: [[LeaderPalette.Group]] = [
+            [LeaderPalette.Group(title: "Go", items: go)],
+            [panes, more],
+            [tabs],
+        ]
+
+        let p = LeaderPalette(frame: host.bounds, title: "Commands", columns: columns)
+        host.addSubview(p)
+        palette = p
     }
 }

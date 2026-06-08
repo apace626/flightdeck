@@ -211,4 +211,10 @@ type = "web"
 title = "ChatGPT"
 url = "https://chatgpt.com"
 key = "c"
+
+[destinations.trello]
+type = "web"
+title = "Trello"
+url = "https://trello.com"
+key = "r"
 """

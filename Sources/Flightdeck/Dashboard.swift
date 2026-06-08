@@ -101,7 +101,9 @@ enum Dashboard {
       fi
 
       if [ -z "$weather" ] || [ $((now - weather_t)) -ge 1800 ]; then
-        weather=$(curl -s --max-time 10 'wttr.in/77059?0' 2>/dev/null || echo '  weather unavailable')
+        w=$(curl -s --max-time 10 'wttr.in/77059?0' 2>/dev/null)
+        weather=$(printf '%s' "$w" | sed '1,2d')   # drop wttr's own header line
+        [ -z "$weather" ] && weather='  weather unavailable'
         weather_t=$now
       fi
 
@@ -114,7 +116,8 @@ enum Dashboard {
       printf '  %sDEV   %s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$dev" "$rst"
       printf '\\n  %sSTOCKS%s\\n' "$ylw" "$rst"
       printf '%s\\n' "$stocks"
-      printf '\\n%s\\n' "$weather"
+      printf '\\n  %sWEATHER%s\\n' "$ylw" "$rst"
+      printf '%s\\n' "$weather"
       sleep 1
     done
     """
