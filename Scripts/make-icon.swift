@@ -12,47 +12,44 @@ let image = NSImage(size: NSSize(width: size, height: size))
 image.lockFocus()
 let ctx = NSGraphicsContext.current!.cgContext
 
-// --- Bright background squircle (blue → mauve) ---
+// --- Army-green camouflage background squircle ---
 let margin = size * 0.085
 let bg = CGRect(x: margin, y: margin, width: size - margin * 2, height: size - margin * 2)
 ctx.saveGState()
 ctx.addPath(CGPath(roundedRect: bg, cornerWidth: bg.width * 0.2237, cornerHeight: bg.width * 0.2237, transform: nil))
 ctx.clip()
-let grad = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                      colors: [c(137, 180, 250).cgColor, c(203, 166, 247).cgColor] as CFArray,
-                      locations: [0, 1])!
-ctx.drawLinearGradient(grad, start: CGPoint(x: margin, y: size - margin),
-                       end: CGPoint(x: size - margin, y: margin), options: [])
+
+// olive base
+ctx.setFillColor(c(74, 86, 46).cgColor)
+ctx.fill(bg)
+
+// soft camo patches (radial blobs in varied military greens)
+let patches: [(CGFloat, CGFloat, CGFloat, NSColor)] = [
+    (0.28, 0.72, 0.40, c(54, 66, 30)),    // dark olive
+    (0.74, 0.58, 0.46, c(108, 120, 66)),  // light olive
+    (0.58, 0.26, 0.34, c(43, 52, 24)),    // deep green
+    (0.18, 0.34, 0.32, c(125, 122, 78)),  // khaki
+    (0.82, 0.86, 0.30, c(92, 104, 54)),
+    (0.40, 0.48, 0.26, c(60, 74, 36)),
+]
+for (x, y, rad, col) in patches {
+    let g = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
+                       colors: [col.withAlphaComponent(0.9).cgColor, col.withAlphaComponent(0).cgColor] as CFArray,
+                       locations: [0, 1])!
+    let center = CGPoint(x: size * x, y: size * y)
+    ctx.drawRadialGradient(g, startCenter: center, startRadius: 0,
+                           endCenter: center, endRadius: size * rad, options: [])
+}
 ctx.restoreGState()
 
-// --- White jet silhouette, centered, pointing up ---
-let r = size * 0.30
-let cx = size / 2, cy = size / 2
-func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: cx + x * r, y: cy + y * r) }
-
-// right-half outline (nose → wing → tail → center); left side mirrored.
-let pts: [(CGFloat, CGFloat)] = [
-    (0,    1.05),   // nose
-    (0.12, 0.28),   // fuselage shoulder
-    (0.95, -0.32),  // wing tip
-    (0.20, -0.44),  // wing root trailing
-    (0.14, -0.80),  // aft fuselage
-    (0.52, -1.05),  // tailplane tip
-    (0.10, -0.94),  // tail root
-    (0,   -0.86),   // tail center
-]
-
-let path = CGMutablePath()
-path.move(to: p(pts[0].0, pts[0].1))
-for i in 1..<pts.count { path.addLine(to: p(pts[i].0, pts[i].1)) }
-for i in stride(from: pts.count - 2, through: 1, by: -1) {
-    path.addLine(to: p(-pts[i].0, pts[i].1))   // mirror
-}
-path.closeSubpath()
-
-ctx.addPath(path)
-ctx.setFillColor(NSColor.white.cgColor)
-ctx.fillPath()
+// --- Big bold white "FD", centered ---
+let letter = "FD"
+let font = NSFont.systemFont(ofSize: size * 0.40, weight: .heavy)
+let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: NSColor.white]
+let str = NSAttributedString(string: letter, attributes: attrs)
+let textSize = str.size()
+str.draw(at: NSPoint(x: (size - textSize.width) / 2,
+                     y: (size - textSize.height) / 2))
 
 image.unlockFocus()
 
