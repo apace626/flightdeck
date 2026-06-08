@@ -186,6 +186,13 @@ type = "terminal"
 title = "Files"
 key = "f"
 
+[destinations.braindump]
+# fzf-browse ~/sync/braindump on open; Esc drops to a shell there.
+type = "terminal"
+title = "Braindump"
+command = "cd ~/sync/braindump && ff; exec ${SHELL:-/bin/zsh} -l"
+key = "b"
+
 [destinations.tasks]
 # taskwarrior-tui (manage) + a live summary pane.
 type = "tasks"
