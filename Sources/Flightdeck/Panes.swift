@@ -35,13 +35,19 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
         }
     }
 
-    init(command: String? = nil, workingDirectory: String? = nil, extraEnv: [String: String] = [:], keepAlive: Bool = false) {
+    init(command: String? = nil, workingDirectory: String? = nil, extraEnv: [String: String] = [:], keepAlive: Bool = false, hideCursor: Bool = false) {
         terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
         terminal.processDelegate = self
         terminal.font = Self.preferredFont
         Self.theme?.apply(to: terminal)
+        if hideCursor {
+            // Output-only panes (dashboard, build/watch panes): make the caret
+            // invisible so it doesn't blink/distract.
+            terminal.caretColor = .clear
+            terminal.caretTextColor = .clear
+        }
         terminal.frame = bounds
         terminal.autoresizingMask = [.width, .height]
         addSubview(terminal)

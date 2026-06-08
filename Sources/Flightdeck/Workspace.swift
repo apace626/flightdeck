@@ -40,7 +40,7 @@ final class PaneSplitView: NSSplitView {
 
 /// Declarative description of a pane tree — the spec's layout format (§4.2).
 indirect enum PaneSpec {
-    case terminal(command: String?, cwd: String? = nil, env: [String: String] = [:], keepAlive: Bool = false)
+    case terminal(command: String?, cwd: String? = nil, env: [String: String] = [:], keepAlive: Bool = false, hideCursor: Bool = false)
     case web(URL)
     /// `vertical == true` → side-by-side columns; `false` → stacked rows.
     case split(vertical: Bool, ratios: [CGFloat], children: [PaneSpec])
@@ -83,8 +83,8 @@ final class Workspace: NSView {
 
     private static func build(_ spec: PaneSpec, into terms: inout [TerminalPane]) -> NSView {
         switch spec {
-        case .terminal(let command, let cwd, let env, let keepAlive):
-            let pane = TerminalPane(command: command, workingDirectory: cwd, extraEnv: env, keepAlive: keepAlive)
+        case .terminal(let command, let cwd, let env, let keepAlive, let hideCursor):
+            let pane = TerminalPane(command: command, workingDirectory: cwd, extraEnv: env, keepAlive: keepAlive, hideCursor: hideCursor)
             terms.append(pane)
             return pane
         case .web(let url):

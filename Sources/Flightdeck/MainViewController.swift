@@ -24,7 +24,9 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     private var config: Config!
     private var projects: [String: Project] = [:]   // keyed by name
     private var control: ControlServer?
-    private let dictation = Dictation()
+    // Lazy: don't create the audio engine / speech recognizer (and trigger their
+    // permission prompts) until the user first presses leader+m.
+    private lazy var dictation = Dictation()
     private var visualizer: VisualizerOverlay?
     private var dictationKeyMonitor: Any?
 

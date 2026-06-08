@@ -16,9 +16,9 @@ enum Dashboard {
         let status = ensureScript(name: "status.sh", content: statusScript)
         let stocks = ensureScript(name: "stocks.sh", content: stocksScript)
         return .split(vertical: false, ratios: [0.30, 0.22, 0.48], children: [
-            .terminal(command: "sh '\(status)'"),
-            .terminal(command: "sh '\(stocks)'"),
-            .terminal(command: weather),
+            .terminal(command: "sh '\(status)'", hideCursor: true),
+            .terminal(command: "sh '\(stocks)'", hideCursor: true),
+            .terminal(command: weather, hideCursor: true),
         ])
     }
 

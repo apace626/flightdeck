@@ -59,6 +59,7 @@ private struct RawLayout: Codable {
     var web: String?
     var cwd: String?
     var name: String?
+    var cursor: Bool?           // false → hide the blinking cursor (output-only panes)
 }
 
 // MARK: - Loader
@@ -167,7 +168,9 @@ enum ProjectLoader {
         // run panes keepAlive so a finished/errored command leaves the pane (and
         // its output) in place rather than collapsing the layout.
         let cwd = node.cwd.map { expand($0, relativeTo: root) } ?? root
-        return .terminal(command: node.run, cwd: cwd, env: env, keepAlive: node.run != nil)
+        let hideCursor = node.cursor == false
+        return .terminal(command: node.run, cwd: cwd, env: env,
+                         keepAlive: node.run != nil, hideCursor: hideCursor)
     }
 
     private static func evenRatios(_ n: Int) -> [Double] {
