@@ -48,7 +48,13 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
             terminal.caretColor = .clear
             terminal.caretTextColor = .clear
         }
-        terminal.frame = bounds
+        // Inset the terminal so text isn't flush against the pane edges. The pane
+        // background matches the terminal's, so the inset reads as internal padding.
+        // Fixed margins (autoresizing keeps left/top/right/bottom constant on resize).
+        wantsLayer = true
+        layer?.backgroundColor = terminal.nativeBackgroundColor.cgColor
+        let pad: CGFloat = 8
+        terminal.frame = bounds.insetBy(dx: pad, dy: pad)
         terminal.autoresizingMask = [.width, .height]
         addSubview(terminal)
 
