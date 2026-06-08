@@ -12,10 +12,8 @@ import Foundation
 enum Dashboard {
     static func spec() -> PaneSpec {
         let top = ensureScript(name: "dash-top.sh", content: topScript)
-        return .split(vertical: false, ratios: [0.34, 0.66], children: [
-            .terminal(command: "sh '\(top)'", hideCursor: true),
-            .terminal(command: weather, hideCursor: true),
-        ])
+        // Single pane: status + stocks + current weather.
+        return .terminal(command: "sh '\(top)'", hideCursor: true)
     }
 
     /// Write a default dashboard script to the config dir if absent, return its path.
@@ -30,16 +28,7 @@ enum Dashboard {
         return path.path
     }
 
-    // Full wttr.in output for ZIP 77059 — ASCII art + current + 3-day forecast.
-    private static let weather = """
-    while true; do \
-      clear; \
-      curl -s --max-time 10 'wttr.in/77059' 2>/dev/null || echo 'weather unavailable (offline?)'; \
-      sleep 1800; \
-    done
-    """
-
-    // Combined top pane: system status + stocks. Edit freely (SYMBOLS, ports, etc.).
+    // Combined dashboard: system status + stocks + current weather. Edit freely.
     // Delete ~/.config/flightdeck/dash-top.sh to regenerate.
     private static let topScript = """
     #!/bin/sh
@@ -53,6 +42,7 @@ enum Dashboard {
     ip4=""; pubip=""; city=""; net_t=0
     sys=""; dev=""; slow_t=0
     stocks=""; stock_t=0
+    weather=""; weather_t=0
 
     while true; do
       now=$(date +%s)
@@ -110,6 +100,11 @@ enum Dashboard {
         stock_t=$now
       fi
 
+      if [ -z "$weather" ] || [ $((now - weather_t)) -ge 1800 ]; then
+        weather=$(curl -s --max-time 10 'wttr.in/77059?0' 2>/dev/null || echo '  weather unavailable')
+        weather_t=$now
+      fi
+
       clear
       printf '\\n  %sFlightdeck%s\\n' "$cyan" "$rst"
       printf '  %s%s%s\\n' "$bold" "$(date '+%A  %B %-d')" "$rst"
@@ -119,6 +114,7 @@ enum Dashboard {
       printf '  %sDEV   %s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$dev" "$rst"
       printf '\\n  %sSTOCKS%s\\n' "$ylw" "$rst"
       printf '%s\\n' "$stocks"
+      printf '\\n%s\\n' "$weather"
       sleep 1
     done
     """
