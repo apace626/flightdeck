@@ -12,7 +12,8 @@ import Foundation
 enum Dashboard {
     static func spec() -> PaneSpec {
         let top = ensureScript(name: "dash-top.sh", content: topScript)
-        // Single pane: status + stocks + current weather.
+        _ = ensureScript(name: "banner.txt", content: bannerArt)
+        // Single pane: banner + status + tools + stocks + current weather.
         return .terminal(command: "sh '\(top)'", hideCursor: true)
     }
 
@@ -28,6 +29,14 @@ enum Dashboard {
         return path.path
     }
 
+    // FLIGHTDECK ASCII wordmark (figlet "small"), written to banner.txt.
+    private static let bannerArt = """
+     ___ _    ___ ___ _  _ _____ ___  ___ ___ _  __
+    | __| |  |_ _/ __| || |_   _|   \\| __/ __| |/ /
+    | _|| |__ | | (_ | __ | | | | |) | _| (__| ' <\u{0020}
+    |_| |____|___\\___|_||_| |_| |___/|___\\___|_|\\_\\
+    """
+
     // Combined dashboard: system status + stocks + current weather. Edit freely.
     // Delete ~/.config/flightdeck/dash-top.sh to regenerate.
     private static let topScript = """
@@ -37,10 +46,11 @@ enum Dashboard {
     SYMBOLS="NVDA AAL YOLO ^GSPC ^IXIC ^DJI"
 
     e=$(printf '\\033')
-    dim="$e[2m"; bold="$e[1m"; cyan="$e[1;36m"; white="$e[1;37m"; ylw="$e[1;33m"; rst="$e[0m"
+    dim="$e[2m"; bold="$e[1m"; cyan="$e[1;36m"; white="$e[1;37m"; ylw="$e[1;33m"; grn="$e[1;32m"; red="$e[1;31m"; rst="$e[0m"
+    DEPS="nvim git fzf fd bat pandoc lazygit task taskwarrior-tui"
 
     ip4=""; pubip=""; city=""; net_t=0
-    sys=""; dev=""; slow_t=0
+    sys=""; dev=""; tools=""; slow_t=0
     stocks=""; stock_t=0
     weather=""; weather_t=0
 
@@ -74,6 +84,11 @@ enum Dashboard {
         done
         [ -z "$open" ] && open=" none"
         dev="$dirty repo(s) changed  -  ports$open"
+        tools=""
+        for t in $DEPS; do
+          if command -v "$t" >/dev/null 2>&1; then tools="$tools $grn$t$rst"
+          else tools="$tools $red$t$rst"; fi
+        done
         slow_t=$now
       fi
 
@@ -108,12 +123,14 @@ enum Dashboard {
       fi
 
       clear
-      printf '\\n  %sFlightdeck%s\\n' "$cyan" "$rst"
-      printf '  %s%s%s\\n' "$bold" "$(date '+%A  %B %-d')" "$rst"
-      printf '  %s%s%s\\n\\n' "$white" "$(date '+%H:%M:%S')" "$rst"
+      printf '\\n%s' "$cyan"
+      sed 's/^/  /' "$HOME/.config/flightdeck/banner.txt" 2>/dev/null
+      printf '%s\\n' "$rst"
+      printf '  %s%s   %s%s%s\\n\\n' "$bold" "$(date '+%A  %B %-d')" "$white" "$(date '+%H:%M:%S')" "$rst"
       printf '  %sSYSTEM%s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$sys" "$rst"
       printf '  %sNET   %s  %s%s  -  %s %s%s\\n' "$ylw" "$rst" "$dim" "$ip4" "$pubip" "$city" "$rst"
       printf '  %sDEV   %s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$dev" "$rst"
+      printf '  %sTOOLS %s %s\\n' "$ylw" "$rst" "$tools"
       printf '\\n  %sSTOCKS%s\\n' "$ylw" "$rst"
       printf '%s\\n' "$stocks"
       printf '\\n  %sWEATHER%s\\n' "$ylw" "$rst"
