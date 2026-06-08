@@ -44,13 +44,10 @@ enum FilesBrowser {
       out=$(fd --type f --hidden --follow --strip-cwd-prefix \
                 --exclude .git --exclude node_modules --exclude Library \
             | fzf --print-query --query "$query" --prompt 'files ❯ ' \
-                  --preview 'f={}; case "$f" in \
-                      *.md|*.markdown) glow -s dark -w "${FZF_PREVIEW_COLUMNS:-100}" "$f" 2>/dev/null ;; \
-                      *) bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :400 "$f" 2>/dev/null ;; \
-                    esac' \
+                  --preview 'bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :400 {} 2>/dev/null' \
                   --preview-window 'right,60%' \
                   --bind 'ctrl-g:execute-silent(fd-md {})' \
-                  --header 'Enter: open · ^G: preview md · Esc: quit')
+                  --header 'Enter: open · ^G: render md · Esc: quit')
       rc=$?
       query=$(printf '%s' "$out" | sed -n '1p')
       file=$(printf '%s' "$out" | sed -n '2p')
@@ -124,7 +121,7 @@ enum FilesBrowser {
     if [ -S "$SOCK" ] && [ -f "$out" ] && command -v nc >/dev/null 2>&1; then
       printf "web\\t%s\\tfile://%s\\n" "$title" "$out" | nc -U "$SOCK"
     else
-      open "$out" 2>/dev/null || glow -p "$file"
+      open "$out" 2>/dev/null
     fi
     """
 
