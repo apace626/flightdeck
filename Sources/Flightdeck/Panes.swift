@@ -127,6 +127,10 @@ final class WebPane: PaneView {
 
         super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
+        // Force dark: web apps that honor prefers-color-scheme render dark
+        // regardless of the macOS system appearance.
+        webView.appearance = NSAppearance(named: .darkAqua)
+
         webView.frame = bounds
         webView.autoresizingMask = [.width, .height]
         addSubview(webView)

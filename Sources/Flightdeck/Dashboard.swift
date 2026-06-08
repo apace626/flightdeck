@@ -122,19 +122,31 @@ enum Dashboard {
         weather_t=$now
       fi
 
+      # Build the whole dashboard into one block, then center it in the pane.
+      content=$(
+        printf '%s\\n' "$cyan"
+        sed 's/^/  /' "$HOME/.config/flightdeck/banner.txt" 2>/dev/null
+        printf '%s\\n' "$rst"
+        printf '  %s%s   %s%s%s\\n\\n' "$bold" "$(date '+%A  %B %-d')" "$white" "$(date '+%H:%M:%S')" "$rst"
+        printf '  %sSYSTEM%s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$sys" "$rst"
+        printf '  %sNET   %s  %s%s  -  %s %s%s\\n' "$ylw" "$rst" "$dim" "$ip4" "$pubip" "$city" "$rst"
+        printf '  %sDEV   %s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$dev" "$rst"
+        printf '  %sTOOLS %s %s\\n' "$ylw" "$rst" "$tools"
+        printf '\\n  %sSTOCKS%s\\n' "$ylw" "$rst"
+        printf '%s\\n' "$stocks"
+        printf '\\n  %sWEATHER%s\\n' "$ylw" "$rst"
+        printf '%s' "$weather"
+      )
+      cols=$(tput cols 2>/dev/null || echo 80)
+      rows=$(tput lines 2>/dev/null || echo 30)
+      plain=$(printf '%s' "$content" | sed "s/$e\\[[0-9;]*m//g")
+      maxw=$(printf '%s\\n' "$plain" | awk '{ if (length > m) m = length } END { print m + 0 }')
+      nlines=$(printf '%s\\n' "$content" | wc -l | tr -d ' ')
+      pad=$(( (cols - maxw) / 2 )); [ "$pad" -lt 0 ] && pad=0
+      top=$(( (rows - nlines) / 2 )); [ "$top" -lt 0 ] && top=0
       clear
-      printf '\\n%s' "$cyan"
-      sed 's/^/  /' "$HOME/.config/flightdeck/banner.txt" 2>/dev/null
-      printf '%s\\n' "$rst"
-      printf '  %s%s   %s%s%s\\n\\n' "$bold" "$(date '+%A  %B %-d')" "$white" "$(date '+%H:%M:%S')" "$rst"
-      printf '  %sSYSTEM%s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$sys" "$rst"
-      printf '  %sNET   %s  %s%s  -  %s %s%s\\n' "$ylw" "$rst" "$dim" "$ip4" "$pubip" "$city" "$rst"
-      printf '  %sDEV   %s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$dev" "$rst"
-      printf '  %sTOOLS %s %s\\n' "$ylw" "$rst" "$tools"
-      printf '\\n  %sSTOCKS%s\\n' "$ylw" "$rst"
-      printf '%s\\n' "$stocks"
-      printf '\\n  %sWEATHER%s\\n' "$ylw" "$rst"
-      printf '%s\\n' "$weather"
+      i=0; while [ "$i" -lt "$top" ]; do echo; i=$((i + 1)); done
+      printf '%s\\n' "$content" | sed "s/^/$(printf "%${pad}s" '')/"
       sleep 1
     done
     """
