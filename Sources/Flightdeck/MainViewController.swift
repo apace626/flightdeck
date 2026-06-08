@@ -120,6 +120,31 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             tabs.firstIndex { $0.destination == active || (active == "terminal" && $0.destination == nil) }
         } ?? 0
         selectTab(initialIndex)
+
+        maybeShowWelcome()
+    }
+
+    // MARK: - First-run welcome / dependency check
+
+    private func maybeShowWelcome() {
+        let key = "didWelcome"
+        let firstRun = !UserDefaults.standard.bool(forKey: key)
+
+        Dependencies.check { [weak self] statuses in
+            guard let self else { return }
+            let missingRequired = Dependencies.tools.contains { $0.required && statuses[$0.name] == false }
+            guard firstRun || missingRequired else { return }
+
+            let welcome = WelcomeOverlay(frame: self.view.bounds)
+            welcome.apply(statuses: statuses)
+            welcome.onContinue = { [weak self, weak welcome] in
+                UserDefaults.standard.set(true, forKey: key)
+                welcome?.removeFromSuperview()
+                self?.activeWorkspace?.focusInitial()
+            }
+            self.view.addSubview(welcome)
+            welcome.focusContinue()
+        }
     }
 
     // MARK: - Leader actions
