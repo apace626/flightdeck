@@ -113,6 +113,14 @@ final class TextPrompt: NSView, NSTextFieldDelegate {
 
     func focusField() {
         window?.makeFirstResponder(field)
+        // Catppuccin selection (default blue-on-light is unreadable with light text).
+        if let editor = field.currentEditor() as? NSTextView {
+            editor.selectedTextAttributes = [
+                .backgroundColor: Self.surface1,
+                .foregroundColor: Self.text,
+            ]
+            editor.insertionPointColor = Self.mauve
+        }
         field.currentEditor()?.selectAll(nil)
     }
 
