@@ -56,29 +56,92 @@ private extension Array {
 final class Workspace: NSView {
     weak var delegate: WorkspaceDelegate?
     private var root: NSView
+    private let content = NSView()              // hosts the pane tree
+    private let statusBar: StatusBarView?
+    private var statusTimer: Timer?
 
-    private init(rootView: NSView, terminals: [TerminalPane]) {
+    private init(rootView: NSView, terminals: [TerminalPane],
+                 statusBar sb: (command: String, cwd: String)?) {
         root = rootView
+        statusBar = sb != nil ? StatusBarView() : nil
         super.init(frame: NSRect(x: 0, y: 0, width: 1280, height: 760))
+
+        content.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(content)
+
+        if let bar = statusBar, let sb {
+            bar.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(bar)
+            NSLayoutConstraint.activate([
+                bar.leadingAnchor.constraint(equalTo: leadingAnchor),
+                bar.trailingAnchor.constraint(equalTo: trailingAnchor),
+                bar.bottomAnchor.constraint(equalTo: bottomAnchor),
+                bar.heightAnchor.constraint(equalToConstant: 26),
+                content.topAnchor.constraint(equalTo: topAnchor),
+                content.leadingAnchor.constraint(equalTo: leadingAnchor),
+                content.trailingAnchor.constraint(equalTo: trailingAnchor),
+                content.bottomAnchor.constraint(equalTo: bar.topAnchor),
+            ])
+            startStatus(command: sb.command, cwd: sb.cwd)
+        } else {
+            NSLayoutConstraint.activate([
+                content.topAnchor.constraint(equalTo: topAnchor),
+                content.leadingAnchor.constraint(equalTo: leadingAnchor),
+                content.trailingAnchor.constraint(equalTo: trailingAnchor),
+                content.bottomAnchor.constraint(equalTo: bottomAnchor),
+            ])
+        }
+
         installRoot(rootView)
         terminals.forEach { hook($0) }
     }
 
+    deinit { statusTimer?.invalidate() }
+
     convenience init(initialPane: PaneView) {
         let terms = (initialPane as? TerminalPane).map { [$0] } ?? []
-        self.init(rootView: initialPane, terminals: terms)
+        self.init(rootView: initialPane, terminals: terms, statusBar: nil)
     }
 
-    /// Build a multi-pane workspace from a declarative spec.
-    convenience init(spec: PaneSpec) {
+    /// Build a multi-pane workspace from a declarative spec, with an optional
+    /// bottom status bar (a shell command run periodically in `cwd`).
+    convenience init(spec: PaneSpec, statusBar: (command: String, cwd: String)? = nil) {
         var terms: [TerminalPane] = []
         let view = Workspace.build(spec, into: &terms)
-        self.init(rootView: view, terminals: terms)
+        self.init(rootView: view, terminals: terms, statusBar: statusBar)
     }
 
     /// Convenience: workspace with a fresh shell.
     convenience init() {
         self.init(initialPane: TerminalPane())
+    }
+
+    // MARK: - Status bar
+
+    private func startStatus(command: String, cwd: String) {
+        let dir = cwd.replacingOccurrences(of: "'", with: "'\\''")
+        let run: () -> Void = { [weak self] in
+            DispatchQueue.global(qos: .utility).async {
+                let proc = Process()
+                proc.executableURL = URL(fileURLWithPath: "/bin/zsh")
+                proc.arguments = ["-lc", "cd '\(dir)' && \(command)"]
+                let pipe = Pipe()
+                proc.standardOutput = pipe
+                proc.standardError = FileHandle.nullDevice
+                var text = ""
+                do {
+                    try proc.run()
+                    let d = pipe.fileHandleForReading.readDataToEndOfFile()
+                    proc.waitUntilExit()
+                    text = String(data: d, encoding: .utf8) ?? ""
+                } catch {}
+                let line = text.split(separator: "\n").first.map(String.init)?
+                    .trimmingCharacters(in: .whitespaces) ?? ""
+                DispatchQueue.main.async { self?.statusBar?.setText(line) }
+            }
+        }
+        run()
+        statusTimer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { _ in run() }
     }
 
     private static func build(_ spec: PaneSpec, into terms: inout [TerminalPane]) -> NSView {
@@ -104,9 +167,9 @@ final class Workspace: NSView {
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
     private func installRoot(_ view: NSView) {
-        view.frame = bounds
+        view.frame = content.bounds
         view.autoresizingMask = [.width, .height]
-        addSubview(view)
+        content.addSubview(view)
         root = view
     }
 
@@ -255,4 +318,43 @@ final class Workspace: NSView {
         }
         best?.pane.takeFocus()
     }
+}
+
+/// A thin bottom status bar showing a single line of text (e.g., git status).
+final class StatusBarView: NSView {
+    private let label = NSTextField(labelWithString: "")
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor(srgbRed: 49 / 255, green: 50 / 255, blue: 68 / 255, alpha: 1).cgColor
+
+        // Use the configured terminal (Nerd) font so glyphs like  render.
+        label.font = NSFont(name: TerminalPane.preferredFont.fontName, size: 11)
+            ?? .monospacedSystemFont(ofSize: 11, weight: .medium)
+        label.textColor = NSColor(srgbRed: 166 / 255, green: 173 / 255, blue: 200 / 255, alpha: 1)
+        label.lineBreakMode = .byTruncatingTail
+        label.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(label)
+
+        let border = NSView()
+        border.wantsLayer = true
+        border.layer?.backgroundColor = NSColor(srgbRed: 24 / 255, green: 24 / 255, blue: 37 / 255, alpha: 1).cgColor
+        border.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(border)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -14),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+            border.leadingAnchor.constraint(equalTo: leadingAnchor),
+            border.trailingAnchor.constraint(equalTo: trailingAnchor),
+            border.topAnchor.constraint(equalTo: topAnchor),
+            border.heightAnchor.constraint(equalToConstant: 1),
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    func setText(_ s: String) { label.stringValue = s }
 }

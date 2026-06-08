@@ -82,6 +82,9 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         tabBar.onNewTab = { [weak self] in
             self?.addTerminalTab()
         }
+        tabBar.onClose = { [weak self] index in
+            self?.closeTab(at: index)
+        }
 
         // Discover projects: central projects.toml first, then in-repo
         // flightdeck.toml files (which win on a name collision).
@@ -394,7 +397,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             if select { selectTab(index) }
             return
         }
-        let workspace = Workspace(spec: project.layout)
+        let statusBar = project.statusbar.map { (command: $0, cwd: project.root) }
+        let workspace = Workspace(spec: project.layout, statusBar: statusBar)
         workspace.delegate = self
         tabs.append(Tab(title: project.name, destination: name, workspace: workspace))
         if select { selectTab(tabs.count - 1) } else { refreshTabBar() }

@@ -19,6 +19,7 @@ struct Project {
     let env: [String: String]
     let layout: PaneSpec
     let commands: [ProjectCommand]
+    let statusbar: String?   // shell command (run in root) → bottom status bar text
 }
 
 // MARK: - TOML shape
@@ -38,6 +39,7 @@ private struct RawProjectFile: Codable {
     var env: [String: String]?
     var layout: RawLayout?
     var commands: [String: Command]?
+    var statusbar: String?
 }
 
 /// One project entry in a central `projects.toml` (keyed by project name).
@@ -48,6 +50,7 @@ private struct RawCentralProject: Codable {
     var env: [String: String]?
     var layout: RawLayout?
     var commands: [String: RawProjectFile.Command]?
+    var statusbar: String?
 }
 
 /// A layout node: either a leaf (`run`/`web`) or a split (`split` + `panes`).
@@ -111,7 +114,8 @@ enum ProjectLoader {
                     ProjectCommand(key: cmd.key?.first, name: ckey, run: cmd.run, target: target(cmd.in))
                 }
                 projects.append(Project(name: raw.name ?? key, key: raw.key?.first,
-                                        root: root, env: env, layout: layout, commands: commands))
+                                        root: root, env: env, layout: layout, commands: commands,
+                                        statusbar: raw.statusbar))
             }
             return projects.sorted { $0.name.lowercased() < $1.name.lowercased() }
         } catch {
@@ -143,7 +147,8 @@ enum ProjectLoader {
             }.sorted { ($0.key.map(String.init) ?? $0.name) < ($1.key.map(String.init) ?? $1.name) }
 
             return Project(name: name, key: raw.project?.key?.first, root: root,
-                           env: env, layout: layout, commands: commands)
+                           env: env, layout: layout, commands: commands,
+                           statusbar: raw.statusbar)
         } catch {
             FileHandle.standardError.write(Data("flightdeck: bad project config \(path): \(error)\n".utf8))
             return nil
