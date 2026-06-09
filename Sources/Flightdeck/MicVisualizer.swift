@@ -90,7 +90,7 @@ final class Dictation {
 
 /// A bottom-center HUD with a live, mirrored waveform of recent mic levels.
 final class VisualizerOverlay: NSView {
-    private let panel = NSVisualEffectView()
+    private let panel = NSView()
     private let wave = WaveView()
     private let label = NSTextField(labelWithString: "Listening…")
 
@@ -99,11 +99,17 @@ final class VisualizerOverlay: NSView {
         autoresizingMask = [.width, .height]
         wantsLayer = true
 
-        panel.material = .hudWindow
-        panel.state = .active
-        panel.blendingMode = .withinWindow
+        // Solid dark Catppuccin panel (the HUD blur material read too light).
         panel.wantsLayer = true
+        panel.layer?.backgroundColor = NSColor(srgbRed: 30 / 255, green: 30 / 255, blue: 46 / 255, alpha: 0.98).cgColor
         panel.layer?.cornerRadius = 18
+        panel.layer?.borderWidth = 1
+        panel.layer?.borderColor = NSColor(srgbRed: 69 / 255, green: 71 / 255, blue: 90 / 255, alpha: 1).cgColor
+        panel.shadow = NSShadow()
+        panel.layer?.shadowColor = NSColor.black.cgColor
+        panel.layer?.shadowOpacity = 0.45
+        panel.layer?.shadowRadius = 24
+        panel.layer?.shadowOffset = CGSize(width: 0, height: -6)
         panel.translatesAutoresizingMaskIntoConstraints = false
         addSubview(panel)
 
