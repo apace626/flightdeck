@@ -115,7 +115,7 @@ final class VisualizerOverlay: NSView {
 
         wave.translatesAutoresizingMaskIntoConstraints = false
         label.font = NSFont.monospacedSystemFont(ofSize: 11, weight: .medium)
-        label.textColor = NSColor(srgbRed: 0.80, green: 0.65, blue: 0.97, alpha: 1) // mauve
+        label.textColor = NSColor(srgbRed: 205 / 255, green: 214 / 255, blue: 244 / 255, alpha: 1) // text (matches console)
         label.alignment = .center
         label.lineBreakMode = .byTruncatingHead
         label.maximumNumberOfLines = 1
@@ -173,12 +173,12 @@ final class VisualizerOverlay: NSView {
                 let x = CGFloat(i) * (barW + gap)
                 let amp = max(2, s * (h * 0.9))            // min height so it's never empty
                 let rect = CGRect(x: x, y: mid - amp / 2, width: barW, height: amp)
-                // Catppuccin gradient: mauve → pink across the bars.
+                // Catppuccin blue → green across the bars.
                 let t = CGFloat(i) / CGFloat(count - 1)
                 let color = NSColor(
-                    srgbRed: 0.80 + 0.15 * t,
-                    green: 0.65 - 0.10 * t,
-                    blue: 0.97 - 0.30 * t,
+                    srgbRed: 0.537 + 0.114 * t,
+                    green: 0.706 + 0.184 * t,
+                    blue: 0.980 - 0.349 * t,
                     alpha: 0.55 + 0.45 * s)
                 ctx.setFillColor(color.cgColor)
                 let path = CGPath(roundedRect: rect, cornerWidth: barW / 2, cornerHeight: barW / 2, transform: nil)
