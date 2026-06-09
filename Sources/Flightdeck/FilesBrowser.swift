@@ -9,38 +9,7 @@ enum FilesBrowser {
         install("lg", lgScript)
         install("fd-open", fdOpenScript)
         install("fd-md", fdMdScript)
-        install("gst", gstScript)
     }
-
-    // gst — list every git repo (under ~/Projects, ~/projects) with uncommitted
-    // changes; Enter opens the chosen one in lazygit. lazygit is one-repo-only, so
-    // this is the cross-repo overview it lacks.
-    private static let gstScript = """
-    #!/bin/sh
-    ROOTS="$HOME/Projects"
-    list=$(
-      for base in $ROOTS; do
-        for d in "$base"/*/ "$base"/*/*/; do
-          [ -d "${d}.git" ] || continue
-          st=$(git -C "$d" status --porcelain 2>/dev/null)
-          [ -z "$st" ] && continue
-          n=$(printf '%s\\n' "$st" | grep -c .)
-          br=$(git -C "$d" branch --show-current 2>/dev/null)
-          a=$(git -C "$d" rev-list --count '@{u}'..HEAD 2>/dev/null)
-          printf '%s\\t  %-22s  [%s]  %s changed  ↑%s\\n' "${d%/}" "$(basename "${d%/}")" "${br:-?}" "$n" "${a:-0}"
-        done
-      done
-    )
-    if [ -z "$list" ]; then echo "  ✓ all repos clean"; exit 0; fi
-    sel=$(printf '%s\\n' "$list" \\
-          | fzf --with-nth=2.. --delimiter='\\t' --prompt 'dirty repos ❯ ' \\
-                --header 'Enter → lazygit · Esc → quit' \\
-                --preview 'git -C {1} -c color.status=always status -s 2>/dev/null' \\
-                --preview-window 'right,55%')
-    [ -z "$sel" ] && exit 0
-    repo=$(printf '%s' "$sel" | cut -f1)
-    cd "$repo" && exec lazygit
-    """
 
     // Boxed (--style=full) fzf themed to Catppuccin Mocha. Prepended to ff/lg.
     private static let fzfOpts =

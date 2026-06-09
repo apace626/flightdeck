@@ -56,6 +56,14 @@ enum Dashboard {
     repos=""; repos_t=0
     REPO_ROOTS="$HOME/Projects"
 
+    # Instant loading screen (banner + spinner) so the first frame isn't a black
+    # void while net/stocks/weather fetch on the first loop pass.
+    clear
+    printf '\\n%s' "$cyan"
+    sed 's/^/  /' "$HOME/.config/flightdeck/banner.txt" 2>/dev/null
+    printf '%s\\n\\n  %s%s%s  %s%s%s\\n' "$rst" "$bold" "$(date '+%A  %B %-d')" "$rst" "$white" "$(date '+%H:%M:%S')" "$rst"
+    printf '\\n  %s◐  warming up the cockpit — fetching status, stocks, weather…%s\\n' "$cyan" "$rst"
+
     while true; do
       now=$(date +%s)
 
