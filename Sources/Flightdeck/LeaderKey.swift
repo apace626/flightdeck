@@ -23,15 +23,49 @@ final class LeaderController {
     private var monitor: Any?
     private static let spaceKeyCode: UInt16 = 49
 
+    // Double-tap either Option key (no other key/modifier) → toggle dictation.
+    private var lastOptionTap: TimeInterval = 0
+    private var optionTapCandidate = false
+    private static let doubleTapWindow: TimeInterval = 0.4
+
     init(hostView: NSView, handler: @escaping (LeaderAction) -> Void) {
         self.handler = handler
-        monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        monitor = NSEvent.addLocalMonitorForEvents(matching: [.keyDown, .flagsChanged]) { [weak self] event in
             guard let self else { return event }
-            if event.keyCode == Self.spaceKeyCode && event.modifierFlags.contains(.control) {
-                self.handler(.openLauncher)
-                return nil
+            switch event.type {
+            case .keyDown:
+                if event.keyCode == Self.spaceKeyCode && event.modifierFlags.contains(.control) {
+                    self.handler(.openLauncher)
+                    return nil
+                }
+                self.optionTapCandidate = false   // a key pressed during an Option hold = chord, not a tap
+                return event
+            case .flagsChanged:
+                self.handleFlags(event)
+                return event
+            default:
+                return event
             }
-            return event
+        }
+    }
+
+    /// A "tap" is Option pressed then released with no other key or modifier in
+    /// between; two taps within the window fire dictation. keyCode 58/61 = L/R Option.
+    private func handleFlags(_ event: NSEvent) {
+        guard event.keyCode == 58 || event.keyCode == 61 else { return }
+        if event.modifierFlags.contains(.option) {              // pressed
+            let others: NSEvent.ModifierFlags = [.command, .control, .shift, .function]
+            optionTapCandidate = event.modifierFlags.isDisjoint(with: others)
+        } else {                                                 // released
+            if optionTapCandidate {
+                if event.timestamp - lastOptionTap < Self.doubleTapWindow {
+                    lastOptionTap = 0
+                    handler(.toggleMic)
+                } else {
+                    lastOptionTap = event.timestamp
+                }
+            }
+            optionTapCandidate = false
         }
     }
 
