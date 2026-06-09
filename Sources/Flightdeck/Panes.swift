@@ -50,13 +50,18 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
         }
         // Inset the terminal so text isn't flush against the pane edges. The pane
         // background matches the terminal's, so the inset reads as internal padding.
-        // Fixed margins (autoresizing keeps left/top/right/bottom constant on resize).
+        // Auto Layout constraints (not autoresizing) so the inset reliably holds.
         wantsLayer = true
         layer?.backgroundColor = terminal.nativeBackgroundColor.cgColor
-        let pad: CGFloat = 8
-        terminal.frame = bounds.insetBy(dx: pad, dy: pad)
-        terminal.autoresizingMask = [.width, .height]
+        let pad: CGFloat = 14
+        terminal.translatesAutoresizingMaskIntoConstraints = false
         addSubview(terminal)
+        NSLayoutConstraint.activate([
+            terminal.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
+            terminal.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
+            terminal.topAnchor.constraint(equalTo: topAnchor, constant: pad),
+            terminal.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
+        ])
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         var env = ProcessInfo.processInfo.environment
@@ -84,10 +89,13 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
         let dir = (workingDirectory ?? NSHomeDirectory()).replacingOccurrences(of: "'", with: "'\\''")
         let body: String
         if let command {
-            // keepAlive: after the command exits (finishes or errors), drop to an
-            // interactive shell so the pane persists with its output in scrollback,
-            // instead of closing and collapsing the layout.
-            body = keepAlive ? "\(command); exec '\(shell)' -l" : command
+            // keepAlive: after the command exits — including when the user hits
+            // Ctrl-C — drop to an interactive shell so the pane persists (with its
+            // output in scrollback) instead of closing and collapsing the layout.
+            // `trap ':' INT` makes THIS wrapper survive SIGINT (the child still
+            // dies on Ctrl-C); without it, zsh -c aborts the whole list on Ctrl-C
+            // and the `exec shell` keepAlive never runs.
+            body = keepAlive ? "{ trap ':' INT; \(command); }; exec '\(shell)' -l" : command
         } else {
             body = "exec '\(shell)' -l"
         }
