@@ -9,7 +9,19 @@ enum FilesBrowser {
         install("lg", lgScript)
         install("fd-open", fdOpenScript)
         install("fd-md", fdMdScript)
+        install("fd-preview", fdPreviewScript)
     }
+
+    // fd-preview <file> — tell Flightdeck's Files pane to live-preview <file>
+    // (fired by fzf's focus event). Renders images/PDF/SVG crisply via WebKit.
+    private static let fdPreviewScript = """
+    #!/bin/sh
+    SOCK="$HOME/.config/flightdeck/control.sock"
+    f="$1"
+    [ -z "$f" ] && exit 0
+    case "$f" in /*) ;; *) f="$PWD/$f" ;; esac
+    [ -S "$SOCK" ] && command -v nc >/dev/null 2>&1 && printf "preview\\t%s\\n" "$f" | nc -U "$SOCK"
+    """
 
     // Boxed (--style=full) fzf themed to Catppuccin Mocha. Prepended to ff/lg.
     private static let fzfOpts =
@@ -38,6 +50,16 @@ enum FilesBrowser {
 
     cd "${1:-$PWD}" || exit 1
     query=""
+    # In Flightdeck's Files split (FLIGHTDECK_PREVIEW=1) the preview is an external
+    # native pane driven by fzf's `focus` event → hide fzf's own bat preview here.
+    # Standalone (e.g. Braindump) keeps the inline bat preview.
+    if [ -n "$FLIGHTDECK_PREVIEW" ]; then
+      set -- --preview-window hidden --bind 'focus:execute-silent(fd-preview {})'
+      hdr='Enter open · ^G render · Esc quit'
+    else
+      set -- --preview-window 'right,60%'
+      hdr='Enter open · ^G render · ⇧↑↓/PgUp·PgDn scroll · Esc quit'
+    fi
     while true; do
       # --print-query echoes the typed query as line 1 so we can restore it next
       # loop — otherwise the search resets every time you open a file.
@@ -45,12 +67,12 @@ enum FilesBrowser {
                 --exclude .git --exclude node_modules --exclude Library \
             | fzf --print-query --query "$query" --prompt 'files ❯ ' \
                   --preview 'bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :1500 {} 2>/dev/null' \
-                  --preview-window 'right,60%' \
+                  "$@" \
                   --bind 'ctrl-g:execute-silent(fd-md {})' \
                   --bind 'shift-up:preview-up,shift-down:preview-down' \
                   --bind 'pgup:preview-page-up,pgdn:preview-page-down' \
                   --bind 'ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down' \
-                  --header 'Enter open · ^G render · ⇧↑↓/PgUp·PgDn scroll · Esc quit')
+                  --header "$hdr")
       rc=$?
       query=$(printf '%s' "$out" | sed -n '1p')
       file=$(printf '%s' "$out" | sed -n '2p')

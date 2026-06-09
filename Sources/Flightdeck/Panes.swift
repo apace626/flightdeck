@@ -161,6 +161,25 @@ final class WebPane: PaneView {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    /// Navigate this pane to a new URL (used by the live file-preview pane).
+    func load(_ url: URL) {
+        if url.isFileURL {
+            webView.loadFileURL(url, allowingReadAccessTo: url.deletingLastPathComponent())
+        } else {
+            webView.load(URLRequest(url: url))
+        }
+    }
+
+    /// Dim placeholder shown before anything is selected.
+    func showPlaceholder(_ text: String) {
+        let html = """
+        <html><head><meta name="color-scheme" content="dark"></head>
+        <body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
+        background:#1e1e2e;color:#6c7086;font:14px -apple-system,system-ui,sans-serif;">\(text)</body></html>
+        """
+        webView.loadHTMLString(html, baseURL: nil)
+    }
+
     override func takeFocus() {
         window?.makeFirstResponder(webView)
     }

@@ -126,6 +126,17 @@ final class Workspace: NSView {
         self.init(initialPane: TerminalPane())
     }
 
+    /// Build a split workspace from already-constructed panes (so the caller can
+    /// keep references to them — e.g. a live preview pane it updates later).
+    convenience init(splitVertical: Bool, ratios: [CGFloat], panes: [PaneView]) {
+        let split = PaneSplitView()
+        split.isVertical = splitVertical
+        split.dividerStyle = .thin
+        split.desiredRatios = ratios
+        panes.forEach { split.addArrangedSubview($0) }
+        self.init(rootView: split, terminals: panes.compactMap { $0 as? TerminalPane }, statusBar: nil)
+    }
+
     // MARK: - Status bar
 
     private func startStatus(command: String, cwd: String) {
