@@ -48,20 +48,14 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
             terminal.caretColor = .clear
             terminal.caretTextColor = .clear
         }
-        // Inset the terminal so text isn't flush against the pane edges. The pane
-        // background matches the terminal's, so the inset reads as internal padding.
-        // Auto Layout constraints (not autoresizing) so the inset reliably holds.
+        // The terminal's frame is set in layout() (below) — re-applied on EVERY
+        // layout pass — so a pane that grows when a sibling closes actually resizes
+        // its terminal (and repaints) instead of leaving a black gap. The inset is
+        // the internal padding; the pane background matches the terminal's so the
+        // inset reads as margin.
         wantsLayer = true
         layer?.backgroundColor = terminal.nativeBackgroundColor.cgColor
-        let pad: CGFloat = 14
-        terminal.translatesAutoresizingMaskIntoConstraints = false
         addSubview(terminal)
-        NSLayoutConstraint.activate([
-            terminal.leadingAnchor.constraint(equalTo: leadingAnchor, constant: pad),
-            terminal.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -pad),
-            terminal.topAnchor.constraint(equalTo: topAnchor, constant: pad),
-            terminal.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -pad),
-        ])
 
         let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
         var env = ProcessInfo.processInfo.environment
@@ -103,6 +97,16 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    /// Internal padding around the terminal content (the prompt sits in from edges).
+    private static let pad: CGFloat = 14
+
+    override func layout() {
+        super.layout()
+        // Re-apply every layout pass so the terminal always fills the (padded) pane,
+        // including after a sibling pane closes and this one grows to fill the slot.
+        terminal.frame = bounds.insetBy(dx: Self.pad, dy: Self.pad)
+    }
 
     override func takeFocus() {
         window?.makeFirstResponder(terminal)

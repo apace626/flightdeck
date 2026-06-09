@@ -23,6 +23,16 @@ final class PaneSplitView: NSSplitView {
     var desiredRatios: [CGFloat]?
     private var ratiosApplied = false
 
+    /// Re-tile the surviving children evenly after a pane closes (the original
+    /// ratios no longer apply once a child is gone). Forces a real resize so the
+    /// survivors' terminals repaint into the freed space.
+    func retile() {
+        desiredRatios = nil
+        ratiosApplied = true
+        adjustSubviews()
+        layoutSubtreeIfNeeded()
+    }
+
     override func layout() {
         super.layout()
         guard let ratios = desiredRatios, !ratiosApplied,
@@ -259,12 +269,16 @@ final class Workspace: NSView {
         }
         split.removeArrangedSubview(pane)
         pane.removeFromSuperview()
-        // Re-tile so the survivors fill the freed space. We do NOT reparent a lone
-        // child into the grandparent — moving a SwiftTerm view blanks it — so a
-        // single-child split just stretches its one child to fill the slot.
-        split.adjustSubviews()
         if split.arrangedSubviews.count == 1 {
-            split.arrangedSubviews[0].frame = split.bounds
+            // Collapse the now-redundant split: promote the lone survivor into the
+            // grandparent so it gets a real full-size slot (a single child left in a
+            // split does NOT reliably re-tile). layout() then repaints it.
+            let survivor = split.arrangedSubviews[0]
+            split.removeArrangedSubview(survivor)
+            survivor.removeFromSuperview()
+            replaceInParent(split, with: survivor)
+        } else {
+            (split as? PaneSplitView)?.retile()
         }
         refocusAfterMutation()
     }
