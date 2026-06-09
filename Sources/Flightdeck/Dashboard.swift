@@ -53,6 +53,8 @@ enum Dashboard {
     sys=""; dev=""; tools=""; slow_t=0
     stocks=""; stock_t=0
     weather=""; weather_t=0
+    repos=""; repos_t=0
+    REPO_ROOTS="$HOME/Projects"
 
     while true; do
       now=$(date +%s)
@@ -90,6 +92,23 @@ enum Dashboard {
           else tools="$tools $red$t$rst"; fi
         done
         slow_t=$now
+      fi
+
+      if [ $((now - repos_t)) -ge 30 ]; then
+        repos=$(
+          for base in $REPO_ROOTS; do
+            for d in "$base"/*/ "$base"/*/*/; do
+              [ -d "$d.git" ] || continue
+              st=$(git -C "$d" status --porcelain 2>/dev/null)
+              [ -z "$st" ] && continue
+              n=$(printf '%s\\n' "$st" | grep -c .)
+              br=$(git -C "$d" branch --show-current 2>/dev/null)
+              printf '  %s%-22s%s %s[%s]  %s changed%s\\n' "$red" "$(basename "${d%/}")" "$rst" "$dim" "${br:-?}" "$n" "$rst"
+            done
+          done
+        )
+        [ -z "$repos" ] && repos="  ${grn}all clean${rst}"
+        repos_t=$now
       fi
 
       if [ -z "$stocks" ] || [ $((now - stock_t)) -ge 60 ]; then
@@ -131,6 +150,8 @@ enum Dashboard {
       printf '  %sNET   %s  %s%s  -  %s %s%s\\n' "$ylw" "$rst" "$dim" "$ip4" "$pubip" "$city" "$rst"
       printf '  %sDEV   %s  %s%s%s\\n' "$ylw" "$rst" "$dim" "$dev" "$rst"
       printf '  %sTOOLS %s %s\\n' "$ylw" "$rst" "$tools"
+      printf '\\n  %sREPOS%s  %s(uncommitted)%s\\n' "$ylw" "$rst" "$dim" "$rst"
+      printf '%s\\n' "$repos"
       printf '\\n  %sSTOCKS%s\\n' "$ylw" "$rst"
       printf '%s\\n' "$stocks"
       printf '\\n  %sWEATHER%s\\n' "$ylw" "$rst"
