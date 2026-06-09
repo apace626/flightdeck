@@ -89,13 +89,16 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
         let dir = (workingDirectory ?? NSHomeDirectory()).replacingOccurrences(of: "'", with: "'\\''")
         let body: String
         if let command {
-            // keepAlive: after the command exits — including when the user hits
-            // Ctrl-C — drop to an interactive shell so the pane persists (with its
-            // output in scrollback) instead of closing and collapsing the layout.
-            // `trap ':' INT` makes THIS wrapper survive SIGINT (the child still
-            // dies on Ctrl-C); without it, zsh -c aborts the whole list on Ctrl-C
-            // and the `exec shell` keepAlive never runs.
-            body = keepAlive ? "{ trap ':' INT; \(command); }; exec '\(shell)' -l" : command
+            // keepAlive: the pane must NEVER collapse the layout from within.
+            // - `trap ':' INT` lets the wrapper survive Ctrl-C (child still dies),
+            //   so Ctrl-C drops to a shell instead of aborting the whole list.
+            // - the `while` loop re-spawns the shell on `exit`/Ctrl-D, so quitting
+            //   the shell just gives a fresh prompt — the pane (and the split
+            //   layout) stays put. Close a pane deliberately via the launcher's
+            //   "Close Pane" action, not by exiting its shell.
+            body = keepAlive
+                ? "{ trap ':' INT; \(command); }; while true; do '\(shell)' -l; done"
+                : command
         } else {
             body = "exec '\(shell)' -l"
         }
