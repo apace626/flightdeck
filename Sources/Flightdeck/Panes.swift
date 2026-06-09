@@ -89,16 +89,13 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
         let dir = (workingDirectory ?? NSHomeDirectory()).replacingOccurrences(of: "'", with: "'\\''")
         let body: String
         if let command {
-            // keepAlive: the pane must NEVER collapse the layout from within.
-            // - `trap ':' INT` lets the wrapper survive Ctrl-C (child still dies),
-            //   so Ctrl-C drops to a shell instead of aborting the whole list.
-            // - the `while` loop re-spawns the shell on `exit`/Ctrl-D, so quitting
-            //   the shell just gives a fresh prompt — the pane (and the split
-            //   layout) stays put. Close a pane deliberately via the launcher's
-            //   "Close Pane" action, not by exiting its shell.
-            body = keepAlive
-                ? "{ trap ':' INT; \(command); }; while true; do '\(shell)' -l; done"
-                : command
+            // keepAlive: after the command exits (finishes or is Ctrl-C'd), drop to
+            // an interactive shell so the pane persists with its output. `exit` then
+            // closes the pane (the survivors reflow to fill — see Workspace.close).
+            // `trap ':' INT` lets THIS wrapper survive Ctrl-C (the child still dies),
+            // so Ctrl-C drops to the shell rather than aborting the whole list and
+            // closing the pane.
+            body = keepAlive ? "{ trap ':' INT; \(command); }; exec '\(shell)' -l" : command
         } else {
             body = "exec '\(shell)' -l"
         }
