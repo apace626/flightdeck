@@ -44,10 +44,13 @@ enum FilesBrowser {
       out=$(fd --type f --hidden --follow --strip-cwd-prefix \
                 --exclude .git --exclude node_modules --exclude Library \
             | fzf --print-query --query "$query" --prompt 'files ❯ ' \
-                  --preview 'bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :400 {} 2>/dev/null' \
+                  --preview 'bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :1500 {} 2>/dev/null' \
                   --preview-window 'right,60%' \
                   --bind 'ctrl-g:execute-silent(fd-md {})' \
-                  --header 'Enter: open · ^G: render md · Esc: quit')
+                  --bind 'shift-up:preview-up,shift-down:preview-down' \
+                  --bind 'pgup:preview-page-up,pgdn:preview-page-down' \
+                  --bind 'ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down' \
+                  --header 'Enter open · ^G render · ⇧↑↓/PgUp·PgDn scroll · Esc quit')
       rc=$?
       query=$(printf '%s' "$out" | sed -n '1p')
       file=$(printf '%s' "$out" | sed -n '2p')
