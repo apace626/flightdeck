@@ -24,7 +24,6 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     private var config: Config!
     private var projects: [String: Project] = [:]   // keyed by name
     private var control: ControlServer?
-    private weak var filesPreview: WebPane?   // live preview pane in the Files tab
     // Lazy: don't create the audio engine / speech recognizer (and trigger their
     // permission prompts) until the user first presses leader+m.
     private lazy var dictation = Dictation()
@@ -216,15 +215,12 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         case .dashboard:
             workspace = Workspace(spec: Dashboard.spec())
         case .files:
-            // ff (fzf list) on the left + a live preview pane on the right. ff's
-            // `focus` bind pings the control socket → the preview pane shows the
-            // highlighted file (images/PDF/SVG rendered natively-crisp by WebKit).
-            let ff = TerminalPane(command: "ff", workingDirectory: dest.command ?? NSHomeDirectory(),
-                                  extraEnv: ["FLIGHTDECK_PREVIEW": "1"], keepAlive: true)
-            let preview = WebPane(url: URL(string: "about:blank")!)
-            preview.showPlaceholder("← pick a file to preview")
-            filesPreview = preview
-            workspace = Workspace(splitVertical: true, ratios: [0.45, 0.55], panes: [ff, preview])
+            // ff (fzf file browser with inline bat preview). Starts scoped to
+            // ~/Projects (configurable via the destination's `command`), not the
+            // whole home dir; Ctrl-O inside ff jumps to another directory.
+            let root = dest.command.map { ($0 as NSString).expandingTildeInPath }
+                ?? "\(NSHomeDirectory())/Projects"
+            workspace = Workspace(initialPane: TerminalPane(command: "ff", workingDirectory: root, keepAlive: true))
         case .terminal:
             workspace = Workspace(initialPane: TerminalPane(command: dest.command))
         case .web:
@@ -363,9 +359,6 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             openCommandTab(title: parts[1], command: parts[2])
         case "web" where parts.count >= 3:
             if let url = URL(string: parts[2]) { openWebTab(title: parts[1], url: url) }
-        case "preview" where parts.count >= 2:
-            // Live file preview (ff focus → here). Show the file in the Files pane.
-            filesPreview?.load(URL(fileURLWithPath: parts[1]))
         case "goto" where parts.count >= 2:
             if projects[parts[1]] != nil { openProject(parts[1]) }
             else { openDestination(parts[1]) }

@@ -9,19 +9,7 @@ enum FilesBrowser {
         install("lg", lgScript)
         install("fd-open", fdOpenScript)
         install("fd-md", fdMdScript)
-        install("fd-preview", fdPreviewScript)
     }
-
-    // fd-preview <file> — tell Flightdeck's Files pane to live-preview <file>
-    // (fired by fzf's focus event). Renders images/PDF/SVG crisply via WebKit.
-    private static let fdPreviewScript = """
-    #!/bin/sh
-    SOCK="$HOME/.config/flightdeck/control.sock"
-    f="$1"
-    [ -z "$f" ] && exit 0
-    case "$f" in /*) ;; *) f="$PWD/$f" ;; esac
-    [ -S "$SOCK" ] && command -v nc >/dev/null 2>&1 && printf "preview\\t%s\\n" "$f" | nc -U "$SOCK"
-    """
 
     // Boxed (--style=full) fzf themed to Catppuccin Mocha. Prepended to ff/lg.
     private static let fzfOpts =
@@ -50,33 +38,37 @@ enum FilesBrowser {
 
     cd "${1:-$PWD}" || exit 1
     query=""
-    # In Flightdeck's Files split (FLIGHTDECK_PREVIEW=1) the preview is an external
-    # native pane driven by fzf's `focus` event → hide fzf's own bat preview here.
-    # Standalone (e.g. Braindump) keeps the inline bat preview.
-    if [ -n "$FLIGHTDECK_PREVIEW" ]; then
-      set -- --preview-window hidden --bind 'focus:execute-silent(fd-preview {})'
-      hdr='Enter open · ^G render · Esc quit'
-    else
-      set -- --preview-window 'right,60%'
-      hdr='Enter open · ^G render · ⇧↑↓/PgUp·PgDn scroll · Esc quit'
-    fi
+    hdr='Enter open · ^O dir · ^G render · ⇧↑↓/PgUp·PgDn scroll · Esc quit'
     while true; do
-      # --print-query echoes the typed query as line 1 so we can restore it next
-      # loop — otherwise the search resets every time you open a file.
+      # Search is scoped to the CURRENT dir ($PWD). Ctrl-O jumps to another dir.
+      # --expect reports the closing key on line 1; --print-query puts the query on
+      # line 2; the selection is line 3.
       out=$(fd --type f --hidden --follow --strip-cwd-prefix \
                 --exclude .git --exclude node_modules --exclude Library \
-            | fzf --print-query --query "$query" --prompt 'files ❯ ' \
+            | fzf --expect=ctrl-o --print-query --query "$query" \
+                  --prompt "$(basename "$PWD")/ ❯ " \
                   --preview 'bat --color=always --theme="Catppuccin Mocha" --style=numbers --line-range :1500 {} 2>/dev/null' \
-                  "$@" \
+                  --preview-window 'right,60%' \
                   --bind 'ctrl-g:execute-silent(fd-md {})' \
                   --bind 'shift-up:preview-up,shift-down:preview-down' \
                   --bind 'pgup:preview-page-up,pgdn:preview-page-down' \
                   --bind 'ctrl-u:preview-half-page-up,ctrl-d:preview-half-page-down' \
                   --header "$hdr")
       rc=$?
-      query=$(printf '%s' "$out" | sed -n '1p')
-      file=$(printf '%s' "$out" | sed -n '2p')
+      key=$(printf '%s' "$out" | sed -n '1p')
+      query=$(printf '%s' "$out" | sed -n '2p')
+      file=$(printf '%s' "$out" | sed -n '3p')
       [ $rc -ne 0 ] && break       # Esc / abort → quit to shell
+
+      if [ "$key" = "ctrl-o" ]; then
+        # Pick a new directory (dirs under $HOME) and re-scope the search there.
+        dir=$(fd --type d --hidden --follow --exclude .git --exclude node_modules \
+                  --exclude Library . "$HOME" \
+              | fzf --prompt 'cd ❯ ' --preview 'ls -p {} 2>/dev/null')
+        [ -n "$dir" ] && cd "$dir" && query=""
+        continue
+      fi
+
       [ -z "$file" ] && continue
       case "$(printf '%s' "$file" | tr 'A-Z' 'a-z')" in
         *.png|*.jpg|*.jpeg|*.gif|*.heic|*.webp|*.bmp|*.tiff|*.svg|*.ico| \
