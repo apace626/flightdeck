@@ -326,7 +326,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             self.dictation.onLevel = { [weak viz] level in viz?.push(level: level) }
             self.dictation.onPartial = { [weak viz] text in viz?.setTranscript(text) }
 
-            // While listening: ⏎ inserts, esc cancels.
+            // While listening: ⏎ inserts, esc cancels. Drop any stale monitor first.
+            if let m = self.dictationKeyMonitor { NSEvent.removeMonitor(m); self.dictationKeyMonitor = nil }
             self.dictationKeyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
                 switch event.keyCode {
                 case 36, 76: self?.finishDictation(insert: true); return nil   // return / enter
@@ -342,10 +343,19 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         if let monitor = dictationKeyMonitor { NSEvent.removeMonitor(monitor); dictationKeyMonitor = nil }
         visualizer?.removeFromSuperview(); visualizer = nil
 
-        guard insert, !text.isEmpty else { return }
-        // Send the transcript into the focused terminal pane (as if typed).
-        if let term = activeWorkspace?.focusedPane() as? TerminalPane {
-            term.terminal.send(txt: text)
+        let term = activeWorkspace?.focusedPane() as? TerminalPane
+        if insert, !text.isEmpty { term?.terminal.send(txt: text) }
+
+        // Restore first responder + force a repaint. The full-view overlay can
+        // leave the pane unfocused / its display stale, so typed characters
+        // wouldn't show (had to restart the program in the pane to recover).
+        DispatchQueue.main.async { [weak self] in
+            if let term {
+                term.takeFocus()
+                term.terminal.needsDisplay = true
+            } else {
+                self?.activeWorkspace?.focusInitial()
+            }
         }
     }
 
