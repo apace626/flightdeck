@@ -346,16 +346,19 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         let term = activeWorkspace?.focusedPane() as? TerminalPane
         if insert, !text.isEmpty { term?.terminal.send(txt: text) }
 
-        // Restore first responder + force a repaint. The full-view overlay can
-        // leave the pane unfocused / its display stale, so typed characters
-        // wouldn't show (had to restart the program in the pane to recover).
+        // After the overlay, SwiftTerm stops repainting — the program's output
+        // lands in the buffer (cursor moves) but the screen stays stale until you
+        // click in. needsDisplay alone doesn't wake it; a tiny size change does
+        // (forces a full re-render + a SIGWINCH so the program repaints its TUI)
+        // — exactly what clicking in triggers.
         DispatchQueue.main.async { [weak self] in
-            if let term {
-                term.takeFocus()
-                term.terminal.needsDisplay = true
-            } else {
-                self?.activeWorkspace?.focusInitial()
-            }
+            guard let term else { self?.activeWorkspace?.focusInitial(); return }
+            term.takeFocus()
+            let tv = term.terminal
+            let s = tv.frame.size
+            tv.setFrameSize(NSSize(width: s.width, height: max(1, s.height - 24)))
+            tv.setFrameSize(s)
+            tv.needsDisplay = true
         }
     }
 
