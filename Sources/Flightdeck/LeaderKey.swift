@@ -12,6 +12,7 @@ enum LeaderAction {
     case focus(Direction)
     case closePane
     case selectTab(Int)
+    case cycleTab(Int)         // +1 next, -1 previous (wraps)
     case toggleZen
 }
 
@@ -39,6 +40,13 @@ final class LeaderController {
                     return nil
                 }
                 self.optionTapCandidate = false   // a key pressed during an Option hold = chord, not a tap
+                // Option + ←/→ cycles tabs (wraps). Overrides the terminal's
+                // Option+arrow word-jump — by request.
+                if event.modifierFlags.contains(.option),
+                   event.modifierFlags.isDisjoint(with: [.command, .control]) {
+                    if event.keyCode == 123 { self.handler(.cycleTab(-1)); return nil }   // ←
+                    if event.keyCode == 124 { self.handler(.cycleTab(1));  return nil }   // →
+                }
                 return event
             case .flagsChanged:
                 self.handleFlags(event)

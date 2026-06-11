@@ -175,6 +175,10 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             activeWorkspace?.closeFocused()
         case .selectTab(let index):
             selectTab(index)
+        case .cycleTab(let delta):
+            guard !tabs.isEmpty else { break }
+            let n = tabs.count
+            selectTab(((activeIndex + delta) % n + n) % n)   // wraps both ways
         case .toggleZen:
             toggleZen()
         }
