@@ -6,6 +6,7 @@ import Foundation
 /// Protocol (one line per connection):
 ///   tab<TAB><title><TAB><shell command>     → open a new tab running the command
 ///   goto<TAB><destination-or-project name>   → jump to / open a destination
+///   task<TAB><text>                          → Apple Reminders quick add
 final class ControlServer {
     static let socketPath = NSHomeDirectory() + "/.config/flightdeck/control.sock"
 

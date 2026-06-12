@@ -40,6 +40,14 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
   <string>Flightdeck uses the microphone for push-to-talk dictation.</string>
   <key>NSSpeechRecognitionUsageDescription</key>
   <string>Flightdeck transcribes your speech on-device for dictation.</string>
+  <key>NSRemindersFullAccessUsageDescription</key>
+  <string>Flightdeck shows your reminders on the dashboard and can add new ones.</string>
+  <key>NSRemindersUsageDescription</key>
+  <string>Flightdeck shows your reminders on the dashboard and can add new ones.</string>
+  <key>NSCalendarsFullAccessUsageDescription</key>
+  <string>Flightdeck shows today's and tomorrow's calendar events on the dashboard.</string>
+  <key>NSCalendarsUsageDescription</key>
+  <string>Flightdeck shows today's and tomorrow's calendar events on the dashboard.</string>
 </dict>
 </plist>
 PLIST

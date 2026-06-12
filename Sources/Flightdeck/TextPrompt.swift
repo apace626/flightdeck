@@ -18,7 +18,9 @@ final class TextPrompt: NSView, NSTextFieldDelegate {
     private static let mauve    = col(203, 166, 247)
     private static let overlay  = col(108, 112, 134)
 
-    init(frame: NSRect, title: String, initial: String) {
+    init(frame: NSRect, title: String, initial: String,
+         placeholder: String = "new name…",
+         hint: String = "↵  rename     esc  cancel") {
         super.init(frame: frame)
         autoresizingMask = [.width, .height]
         wantsLayer = true
@@ -61,7 +63,7 @@ final class TextPrompt: NSView, NSTextFieldDelegate {
         field.translatesAutoresizingMaskIntoConstraints = false
         if let cell = field.cell as? NSTextFieldCell {
             cell.placeholderAttributedString = NSAttributedString(
-                string: "new name…",
+                string: placeholder,
                 attributes: [.foregroundColor: Self.overlay, .font: NSFont.systemFont(ofSize: 17)])
         }
 
@@ -70,7 +72,7 @@ final class TextPrompt: NSView, NSTextFieldDelegate {
         divider.layer?.backgroundColor = Self.surface.cgColor
         divider.translatesAutoresizingMaskIntoConstraints = false
 
-        let hint = NSTextField(labelWithString: "↵  rename     esc  cancel")
+        let hint = NSTextField(labelWithString: hint)
         hint.font = .systemFont(ofSize: 11, weight: .regular)
         hint.textColor = Self.overlay
         hint.translatesAutoresizingMaskIntoConstraints = false

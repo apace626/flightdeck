@@ -27,6 +27,7 @@ struct Config {
     var themeName: String?         // terminal color theme (see TerminalTheme.presets)
     var finderRoots: [String]      // directories the fuzzy finder indexes
     var projectScanRoots: [String] // directories scanned for flightdeck.toml
+    var calendarInclude: [String]  // dashboard agenda calendars; empty = all
 }
 
 // MARK: - TOML file shape
@@ -80,10 +81,15 @@ private struct ConfigFile: Codable {
         var scan: [String]?
     }
 
+    struct CalendarSection: Codable {
+        var include: [String]?
+    }
+
     var general: General?
     var startup: Startup?
     var finder: Finder?
     var projects: Projects?
+    var calendar: CalendarSection?
     var destinations: [String: Dest]?
 }
 
@@ -117,7 +123,8 @@ enum ConfigLoader {
                           destinations: [:], orderedDestinations: [],
                           fontName: nil, fontSize: 13, themeName: nil,
                           finderRoots: ["~/Projects"],
-                          projectScanRoots: ["~/Projects"])
+                          projectScanRoots: ["~/Projects"],
+                          calendarInclude: [])
             return (fallback, "config error in \(configFile.path): \(error)")
         }
     }
@@ -148,7 +155,8 @@ enum ConfigLoader {
             fontSize: file.general?.fontSize ?? 13,
             themeName: file.general?.theme,
             finderRoots: file.finder?.roots ?? ["~/Projects", "~/Downloads", "~/Documents", "~/Desktop"],
-            projectScanRoots: file.projects?.scan ?? ["~/Projects", "~/Projects/personal"]
+            projectScanRoots: file.projects?.scan ?? ["~/Projects", "~/Projects/personal"],
+            calendarInclude: file.calendar?.include ?? []
         )
     }
 }
@@ -175,6 +183,12 @@ active = "dashboard"
 type = "dashboard"
 title = "Dashboard"
 key = "d"
+
+[calendar]
+# Dashboard agenda pane: show only these calendars. An entry matches a
+# calendar name ("Work") or a whole account ("you@gmail.com").
+# Omit (or leave empty) to show all of them.
+# include = ["Personal", "you@gmail.com"]
 
 [finder]
 # Directories indexed by the fuzzy file finder (leader+o).

@@ -63,6 +63,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             FileHandle.standardError.write(Data("flightdeck: \(warning)\n".utf8))
         }
         FilesBrowser.ensure()  // install ff / lg / fd-open helpers on PATH
+        Reminders.start()      // Reminders access + dashboard snapshot feed
+        CalendarEvents.start(include: config.calendarInclude)  // agenda snapshot feed
 
         // Control socket: lets pane shells open tabs / jump to destinations.
         control = ControlServer { [weak self] line in
@@ -312,6 +314,51 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         prompt.focusField()
     }
 
+    // MARK: - Reminders quick capture
+
+    private func addTaskPrompt() {
+        guard !view.subviews.contains(where: { $0 is TextPrompt }) else { return }
+        let prompt = TextPrompt(frame: view.bounds, title: "Add reminder", initial: "",
+                                placeholder: "fix gate latch  #house  due:friday-9am",
+                                hint: "↵  add     esc  cancel")
+        prompt.onSubmit = { [weak self] text in
+            Reminders.add(text) { message in self?.showToast(message) }
+        }
+        prompt.onClose = { [weak self] in self?.activeWorkspace?.focusInitial() }
+        view.addSubview(prompt)
+        prompt.focusField()
+    }
+
+    /// A transient confirmation pill at the bottom of the window.
+    private func showToast(_ text: String) {
+        let label = NSTextField(labelWithString: text)
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = NSColor(srgbRed: 205/255, green: 214/255, blue: 244/255, alpha: 1)
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        let panel = NSView()
+        panel.wantsLayer = true
+        panel.layer?.backgroundColor = NSColor(srgbRed: 30/255, green: 30/255, blue: 46/255, alpha: 0.95).cgColor
+        panel.layer?.cornerRadius = 10
+        panel.layer?.borderWidth = 1
+        panel.layer?.borderColor = NSColor(srgbRed: 69/255, green: 71/255, blue: 90/255, alpha: 1).cgColor
+        panel.translatesAutoresizingMaskIntoConstraints = false
+        panel.addSubview(label)
+        view.addSubview(panel)
+
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: panel.topAnchor, constant: 10),
+            label.bottomAnchor.constraint(equalTo: panel.bottomAnchor, constant: -10),
+            label.leadingAnchor.constraint(equalTo: panel.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(equalTo: panel.trailingAnchor, constant: -16),
+            panel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            panel.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -28),
+        ])
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.2) { [weak panel] in
+            panel?.removeFromSuperview()
+        }
+    }
+
     // MARK: - Dictation (mic → text)
 
     private func toggleMic() {
@@ -379,6 +426,11 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         case "goto" where parts.count >= 2:
             if projects[parts[1]] != nil { openProject(parts[1]) }
             else { openDestination(parts[1]) }
+        case "task" where parts.count >= 2:
+            // task<TAB><text> → Reminders quick add (scripts, hooks, pollers).
+            Reminders.add(parts[1...].joined(separator: " ")) { [weak self] message in
+                self?.showToast(message)
+            }
         default:
             break
         }
@@ -443,6 +495,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             .init(id: "act:close",  title: "Close Pane",       subtitle: "",                  keyHint: nil),
             .init(id: "act:zen",    title: "Zen Mode",         subtitle: "fullscreen",        keyHint: nil),
             .init(id: "act:mic",    title: "Dictate",          subtitle: "voice → text",      keyHint: nil),
+            .init(id: "act:task",   title: "Add Reminder",     subtitle: "Apple Reminders quick capture", keyHint: nil),
         ]
 
         let picker = ListPicker(frame: view.bounds,
@@ -464,6 +517,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         case "act:close":  perform(.closePane)
         case "act:zen":    perform(.toggleZen)
         case "act:mic":    perform(.toggleMic)
+        case "act:task":   addTaskPrompt()
         default: break
         }
     }

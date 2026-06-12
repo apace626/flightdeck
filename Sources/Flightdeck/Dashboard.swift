@@ -12,9 +12,19 @@ import Foundation
 enum Dashboard {
     static func spec() -> PaneSpec {
         let top = ensureScript(name: "dash-top.sh", content: topScript)
+        let agenda = ensureScript(name: "dash-agenda.sh", content: agendaScript)
+        let rem = ensureScript(name: "dash-reminders.sh", content: remindersScript)
         _ = ensureScript(name: "banner.txt", content: bannerArt)
-        // Single pane: banner + status + tools + stocks + current weather.
-        return .terminal(command: "sh '\(top)'", hideCursor: true)
+        // Left 2/3: banner + status + tools + stocks + weather.
+        // Right 1/3, stacked: Apple Reminders on top, calendar agenda
+        // (today + tomorrow) below. Both render snapshots written by the app.
+        return .split(vertical: true, ratios: [0.67, 0.33], children: [
+            .terminal(command: "sh '\(top)'", hideCursor: true),
+            .split(vertical: false, ratios: [0.62, 0.38], children: [
+                .terminal(command: "sh '\(rem)'", hideCursor: true),
+                .terminal(command: "sh '\(agenda)'", hideCursor: true),
+            ]),
+        ])
     }
 
     /// Write a default dashboard script to the config dir if absent, return its path.
@@ -41,6 +51,7 @@ enum Dashboard {
     // Delete ~/.config/flightdeck/dash-top.sh to regenerate.
     private static let topScript = """
     #!/bin/sh
+    PATH="$PATH:/opt/homebrew/bin:$HOME/.local/bin"
     PROJECTS_DIR="$HOME/Projects/personal"
     PORTS="3000 8080 9090 5173"
     SYMBOLS="NVDA AAL YOLO SPCX ^GSPC ^IXIC ^DJI"
@@ -165,6 +176,51 @@ enum Dashboard {
       printf '\\n  %sWEATHER%s\\n' "$ylw" "$rst"
       printf '%s\\n' "$weather"
       sleep 1
+    done
+    """
+
+    // Right-top pane: calendar agenda (CarPlay-style today + tomorrow). Pure
+    // renderer — CalendarEvents.swift (EventKit) rewrites the snapshot every
+    // 2 minutes. Delete ~/.config/flightdeck/dash-agenda.sh to regenerate.
+    private static let agendaScript = """
+    #!/bin/sh
+    F="$HOME/.config/flightdeck/events.txt"
+
+    e=$(printf '\\033')
+    dim="$e[2m"; ylw="$e[1;33m"; rst="$e[0m"
+
+    while true; do
+      clear
+      printf '\\n  %sAGENDA%s\\n' "$ylw" "$rst"
+      if [ -f "$F" ]; then
+        cat "$F"
+      else
+        printf '\\n  %swaiting for calendar…%s\\n  %s(grant access if macOS asks)%s\\n' "$dim" "$rst" "$dim" "$rst"
+      fi
+      sleep 10
+    done
+    """
+
+    // Right pane: Apple Reminders. Pure renderer — Reminders.swift (EventKit)
+    // rewrites the snapshot every 30s; this just cats it. Capture happens via
+    // Siri/phone/Reminders.app, or Ctrl+Space → "Add Reminder".
+    // Delete ~/.config/flightdeck/dash-reminders.sh to regenerate.
+    private static let remindersScript = """
+    #!/bin/sh
+    F="$HOME/.config/flightdeck/reminders.txt"
+
+    e=$(printf '\\033')
+    dim="$e[2m"; ylw="$e[1;33m"; rst="$e[0m"
+
+    while true; do
+      clear
+      printf '\\n  %sREMINDERS%s  %s"hey siri, remind me…"%s\\n' "$ylw" "$rst" "$dim" "$rst"
+      if [ -f "$F" ]; then
+        cat "$F"
+      else
+        printf '\\n  %swaiting for reminders…%s\\n  %s(grant access if macOS asks)%s\\n' "$dim" "$rst" "$dim" "$rst"
+      fi
+      sleep 5
     done
     """
 }

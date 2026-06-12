@@ -40,6 +40,27 @@ Leader: **Ctrl+Space**, then:
 Built-in keys win on collision with destination keys. Typing `exit` in a shell
 closes its pane automatically.
 
+## Reminders
+
+Native Apple Reminders integration via EventKit — no CLI, no extra installs.
+Capture from anywhere Apple listens ("Hey Siri, remind me…" in the car, the
+phone, the watch); iCloud syncs to the Mac and Flightdeck displays it.
+
+- **Dashboard panes** — the dashboard's right column shows a calendar AGENDA
+  (today's and tomorrow's events, current one highlighted; restrict calendars
+  via `[calendar] include = [...]` in config.toml) above open reminders grouped
+  by list, overdue in red, due-today in yellow, with an open/overdue footer.
+  The app refreshes snapshots (`~/.config/flightdeck/{events,reminders}.txt`);
+  the panes just render them.
+- **Quick capture** — Ctrl+Space → "Add Reminder". Syntax:
+  `fix gate latch #house due:friday-9am` (`#list` picks the Reminders list,
+  `due:` takes natural language with dashes for spaces). A toast confirms.
+- **Control socket** — `task<TAB><text>` on `control.sock` quick-adds a
+  reminder (same syntax) for scripts and hooks.
+- **Permissions** — macOS asks for Reminders access on first launch (usage
+  strings are set in `Scripts/bundle.sh`). Ad-hoc re-signing on rebuild can
+  occasionally make macOS re-ask.
+
 ## Stack
 
 - [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm) — terminal panes (planned v2 backend: libghostty)
