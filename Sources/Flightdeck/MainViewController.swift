@@ -210,6 +210,13 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             return
         }
 
+        // localhost: ask for a port, then open http://localhost:<port> in a tab
+        // titled with the port. Each port is its own tab (no singleton jump).
+        if dest.kind == .localhost {
+            promptLocalhost()
+            return
+        }
+
         // Singleton destinations: jump if a tab already exists.
         if dest.singleton, let index = tabs.firstIndex(where: { $0.destination == name }) {
             if select { selectTab(index) }
@@ -235,6 +242,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
                 return
             }
             workspace = Workspace(initialPane: WebPane(url: url))
+        case .localhost:
+            return   // handled above via promptLocalhost()
         }
         workspace.delegate = self
         tabs.append(Tab(title: dest.title, destination: name, workspace: workspace))
@@ -444,6 +453,28 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         selectTab(tabs.count - 1)
     }
 
+    /// Ask for a port and open http://localhost:<port> in a tab named ":<port>".
+    private func promptLocalhost() {
+        guard !view.subviews.contains(where: { $0 is TextPrompt }) else { return }
+        let prompt = TextPrompt(frame: view.bounds, title: "Open localhost", initial: "",
+                                placeholder: "3000",
+                                hint: "↵  open     esc  cancel")
+        prompt.onSubmit = { [weak self] text in
+            guard let self else { return }
+            // Accept "3000", ":3000", "localhost:3000", "http://localhost:3000/x".
+            let digits = text.drop(while: { !$0.isNumber }).prefix(while: { $0.isNumber })
+            guard let port = Int(digits), (1...65535).contains(port),
+                  let url = URL(string: "http://localhost:\(port)") else {
+                self.showToast("not a valid port")
+                return
+            }
+            self.openWebTab(title: ":\(port)", url: url)
+        }
+        prompt.onClose = { [weak self] in self?.activeWorkspace?.focusInitial() }
+        view.addSubview(prompt)
+        prompt.focusField()
+    }
+
     /// Open a new web tab at a URL (used by the control socket — e.g. md preview).
     func openWebTab(title: String, url: URL) {
         let workspace = Workspace(initialPane: WebPane(url: url))
@@ -528,6 +559,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         case .terminal:  return d.command ?? "terminal"
         case .dashboard: return "dashboard"
         case .files:     return "file finder"
+        case .localhost: return "ask for a port → open in a tab"
         }
     }
 

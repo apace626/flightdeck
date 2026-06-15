@@ -129,7 +129,7 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
 
 // MARK: - Web pane (WKWebView, chrome-less)
 
-final class WebPane: PaneView {
+final class WebPane: PaneView, WKNavigationDelegate {
     let webView: WKWebView
 
     init(url: URL) {
@@ -144,6 +144,7 @@ final class WebPane: PaneView {
         }
 
         super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
+        webView.navigationDelegate = self
 
         // Force dark: web apps that honor prefers-color-scheme render dark
         // regardless of the macOS system appearance.
@@ -160,6 +161,35 @@ final class WebPane: PaneView {
     }
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
+
+    // Surface load failures instead of showing a silent white screen — a
+    // blocked cleartext load (ATS) or a dead server otherwise looks identical
+    // to a blank page.
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        showLoadError(error, url: webView.url)
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        showLoadError(error, url: webView.url)
+    }
+
+    private func showLoadError(_ error: Error, url: URL?) {
+        let ns = error as NSError
+        // Code -999 = "another load started" (e.g. a redirect superseded this
+        // one). Not a real failure; ignore so we don't flash an error.
+        if ns.domain == NSURLErrorDomain && ns.code == NSURLErrorCancelled { return }
+        let target = url?.absoluteString ?? "the page"
+        let html = """
+        <html><head><meta name="color-scheme" content="dark"></head>
+        <body style="margin:0;font:14px -apple-system,sans-serif;background:#1e1e2e;color:#cdd6f4;
+                     display:flex;align-items:center;justify-content:center;height:100vh">
+        <div style="max-width:32rem;padding:2rem">
+          <div style="color:#f38ba8;font-weight:600;margin-bottom:.5rem">Couldn't load \(target)</div>
+          <div style="color:#a6adc8">\(ns.localizedDescription) (\(ns.domain) \(ns.code))</div>
+        </div></body></html>
+        """
+        webView.loadHTMLString(html, baseURL: nil)
+    }
 
     /// Navigate this pane to a new URL (used by the live file-preview pane).
     func load(_ url: URL) {

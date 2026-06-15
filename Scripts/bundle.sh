@@ -48,6 +48,21 @@ cat > "${APP}/Contents/Info.plist" <<PLIST
   <string>Flightdeck shows today's and tomorrow's calendar events on the dashboard.</string>
   <key>NSCalendarsUsageDescription</key>
   <string>Flightdeck shows today's and tomorrow's calendar events on the dashboard.</string>
+  <key>NSAppTransportSecurity</key>
+  <dict>
+    <key>NSAllowsLocalNetworking</key>
+    <true/>
+    <key>NSExceptionDomains</key>
+    <dict>
+      <key>localhost</key>
+      <dict>
+        <key>NSExceptionAllowsInsecureHTTPLoads</key>
+        <true/>
+        <key>NSIncludesSubdomains</key>
+        <true/>
+      </dict>
+    </dict>
+  </dict>
 </dict>
 </plist>
 PLIST

@@ -5,7 +5,7 @@ import TOMLKit
 
 struct Destination {
     enum Kind: String {
-        case terminal, web, dashboard, files
+        case terminal, web, dashboard, files, localhost
     }
 
     let name: String        // config key, e.g. "chatgpt"
@@ -214,12 +214,26 @@ title = "Scratchpad"
 command = "nvim"
 key = "s"
 
+[destinations.journal]
+# Daily journal: one rolling file with a "## <date>" header per day. Opens at
+# the bottom (today's space); scroll up for previous days.
+type = "terminal"
+title = "Journal"
+command = "f=~/sync/braindump/journal.md; h=$(date '+## %A, %B %-d, %Y'); grep -qF \"$h\" \"$f\" 2>/dev/null || printf '\\n%s\\n\\n' \"$h\" >> \"$f\"; nvim + \"$f\""
+key = "j"
+
 [destinations.git]
 # Pick a repo (preview shows what changed) → browse diffs in lazygit.
 type = "terminal"
 title = "Git"
 command = "lg"
 key = "g"
+
+[destinations.localhost]
+# Prompts for a port, then opens http://localhost:<port> in a tab named ":<port>".
+type = "localhost"
+title = "localhost"
+key = "l"
 
 [destinations.chatgpt]
 type = "web"
