@@ -9,6 +9,7 @@ enum FilesBrowser {
         install("lg", lgScript)
         install("fd-open", fdOpenScript)
         install("fd-md", fdMdScript)
+        install("cr", crScript)
     }
 
     // Boxed (--style=full) fzf themed to Catppuccin Mocha. Prepended to ff/lg.
@@ -170,5 +171,43 @@ enum FilesBrowser {
       [ -z "$repo" ] && break
       ( cd "$HOME/$repo" && lazygit )
     done
+    """
+
+    // cr — pick a repo, then ask Flightdeck (control socket) to open a code
+    // review tab: codex (left) + lazygit (right). Same picker as lg.
+    private static let crScript = """
+    #!/bin/sh
+    # cr — open a code-review tab (codex | lazygit) for a repo.
+    #   cr        pick a repo under ~/Projects (preview shows what changed)
+    #   cr .      use the current repo
+    # Installed by Flightdeck. Safe to edit; rewritten on next launch.
+    SOCK="$HOME/.config/flightdeck/control.sock"
+
+    \(fzfOpts)
+
+    send() {
+      if [ -S "$SOCK" ] && command -v nc >/dev/null 2>&1; then
+        printf "review\\t%s\\n" "$1" | nc -U "$SOCK"
+      else
+        echo "cr: Flightdeck control socket unavailable"
+      fi
+    }
+
+    if [ -n "$1" ]; then
+      cd "$1" 2>/dev/null || { echo "no such dir: $1"; exit 1; }
+      send "$PWD"
+      exit 0
+    fi
+
+    repo=$(for d in "$HOME"/Projects/*/ "$HOME"/Projects/*/*/; do \
+             [ -d "${d}.git" ] && printf '%s\\n' "${d%/}"; \
+           done | sed "s|^$HOME/||" \
+           | fzf --prompt 'review ❯ ' \
+                 --preview 'git -C "$HOME/{}" -c color.status=always status -s 2>/dev/null; \
+                            echo; git -C "$HOME/{}" log --oneline -8 2>/dev/null' \
+                 --preview-window 'right,55%' \
+                 --header 'Enter: open codex + lazygit · Esc: cancel')
+    [ -z "$repo" ] && exit 0
+    send "$HOME/$repo"
     """
 }
