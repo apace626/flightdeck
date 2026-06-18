@@ -10,8 +10,10 @@ enum CalendarEvents {
     private static var timer: Timer?
     private static var granted = false
     private static var include: [String] = []   // empty = all calendars
+    private static var exclude: [String] = []    // drop these (by name or account)
 
     static let snapshotPath = NSHomeDirectory() + "/.config/flightdeck/events.txt"
+    static let calendarsPath = NSHomeDirectory() + "/.config/flightdeck/calendars.txt"
 
     // ANSI palette (matches dash-top.sh)
     private static let dim = "\u{1B}[2m"
@@ -21,8 +23,9 @@ enum CalendarEvents {
 
     /// Request Calendar access (TCC prompt on first launch — usage strings come
     /// from bundle.sh) and refresh the agenda snapshot every 2 minutes.
-    static func start(include calendarNames: [String]) {
+    static func start(include calendarNames: [String], exclude excludeNames: [String] = []) {
         include = calendarNames
+        exclude = excludeNames
         let finish: (Bool) -> Void = { ok in
             DispatchQueue.main.async {
                 granted = ok
@@ -52,24 +55,20 @@ enum CalendarEvents {
     static func refresh() {
         guard granted else { return }
         DispatchQueue.global(qos: .utility).async {
+            dumpCalendars()   // keep ~/.config/flightdeck/calendars.txt current
             let cal = Calendar.current
             let startToday = cal.startOfDay(for: Date())
             guard let end = cal.date(byAdding: .day, value: 2, to: startToday) else { return }
 
+            // include (whitelist) then exclude (blacklist). An entry matches a
+            // calendar by its own name ("Work") or its account
+            // ("you@gmail.com" → all of that account's calendars).
             var calendars = store.calendars(for: .event)
-            if !include.isEmpty {
-                let wanted = Set(include.map { $0.lowercased() })
-                // An entry matches a calendar by its own name ("Work") or by its
-                // account ("thiscal@gmail.com" → every calendar in that account).
-                let matched = calendars.filter {
-                    wanted.contains($0.title.lowercased())
-                        || wanted.contains(($0.source?.title ?? "").lowercased())
-                }
-                if matched.isEmpty {
-                    write("\n  \(dim)no calendars match config include:\(rst)\n  \(dim)\(include.joined(separator: ", "))\(rst)\n")
-                    return
-                }
-                calendars = matched
+            if !include.isEmpty { calendars = calendars.filter { matches($0, include) } }
+            if !exclude.isEmpty { calendars = calendars.filter { !matches($0, exclude) } }
+            if calendars.isEmpty {
+                write("\n  \(dim)no calendars after include/exclude filters —\(rst)\n  \(dim)see ~/.config/flightdeck/calendars.txt\(rst)\n")
+                return
             }
 
             let predicate = store.predicateForEvents(withStart: startToday, end: end, calendars: calendars)
@@ -130,6 +129,48 @@ enum CalendarEvents {
         out.append("  \(ylw)TOMORROW\(rst)  \(dim)\(dayLabel.string(from: startTomorrow))\(rst)")
         out += lines(for: tomorrow)
         return out.joined(separator: "\n") + "\n"
+    }
+
+    /// True if `cal` matches any name in `names`, by its own title or its
+    /// account (source) title. Case-insensitive.
+    private static func matches(_ cal: EKCalendar, _ names: [String]) -> Bool {
+        let wanted = Set(names.map { $0.lowercased() })
+        return wanted.contains(cal.title.lowercased())
+            || wanted.contains((cal.source?.title ?? "").lowercased())
+    }
+
+    /// Write the full list of calendars EventKit sees to calendars.txt, grouped
+    /// by account, with ✓ (shown) / · (filtered out). EventKit ignores
+    /// Calendar.app's show/hide checkboxes, so this is the real source list —
+    /// use it to fill in `[calendar] exclude`/`include`.
+    private static func dumpCalendars() {
+        let cals = store.calendars(for: .event).sorted {
+            (($0.source?.title ?? "") + $0.title).lowercased()
+                < (($1.source?.title ?? "") + $1.title).lowercased()
+        }
+        var lines = [
+            "Calendars EventKit sees — Calendar.app's show/hide checkboxes do NOT",
+            "affect this list. Mark unwanted ones in ~/.config/flightdeck/config.toml:",
+            "",
+            "  [calendar]",
+            "  exclude = [\"US Holidays\", \"Birthdays\"]   # drop these",
+            "  # include = [\"Personal\", \"Work\"]        # OR show only these",
+            "",
+            "  ✓ = currently shown    · = filtered out",
+            "",
+        ]
+        var lastSource = ""
+        for c in cals {
+            let src = c.source?.title ?? "?"
+            if src != lastSource { lines.append("[\(src)]"); lastSource = src }
+            let included = include.isEmpty || matches(c, include)
+            let excluded = !exclude.isEmpty && matches(c, exclude)
+            let shown = included && !excluded
+            lines.append("  \(shown ? "✓" : "·") \(c.title)")
+        }
+        let dir = (calendarsPath as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        try? lines.joined(separator: "\n").write(toFile: calendarsPath, atomically: true, encoding: .utf8)
     }
 
     private static func write(_ text: String) {

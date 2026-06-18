@@ -67,7 +67,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         FilesBrowser.ensure()  // install ff / lg / fd-open helpers on PATH
         GitDiff.start()        // local diff server for project diff panes
         Reminders.start()      // Reminders access + dashboard snapshot feed
-        CalendarEvents.start(include: config.calendarInclude)  // agenda snapshot feed
+        CalendarEvents.start(include: config.calendarInclude, exclude: config.calendarExclude)  // agenda snapshot feed
 
         // Control socket: lets pane shells open tabs / jump to destinations.
         control = ControlServer { [weak self] line in

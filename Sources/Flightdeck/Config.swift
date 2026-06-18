@@ -28,6 +28,7 @@ struct Config {
     var finderRoots: [String]      // directories the fuzzy finder indexes
     var projectScanRoots: [String] // directories scanned for flightdeck.toml
     var calendarInclude: [String]  // dashboard agenda calendars; empty = all
+    var calendarExclude: [String]  // calendars to drop (e.g. holidays)
 }
 
 // MARK: - TOML file shape
@@ -83,6 +84,7 @@ private struct ConfigFile: Codable {
 
     struct CalendarSection: Codable {
         var include: [String]?
+        var exclude: [String]?
     }
 
     var general: General?
@@ -124,7 +126,7 @@ enum ConfigLoader {
                           fontName: nil, fontSize: 13, themeName: nil,
                           finderRoots: ["~/Projects"],
                           projectScanRoots: ["~/Projects"],
-                          calendarInclude: [])
+                          calendarInclude: [], calendarExclude: [])
             return (fallback, "config error in \(configFile.path): \(error)")
         }
     }
@@ -156,7 +158,8 @@ enum ConfigLoader {
             themeName: file.general?.theme,
             finderRoots: file.finder?.roots ?? ["~/Projects", "~/Downloads", "~/Documents", "~/Desktop"],
             projectScanRoots: file.projects?.scan ?? ["~/Projects", "~/Projects/personal"],
-            calendarInclude: file.calendar?.include ?? []
+            calendarInclude: file.calendar?.include ?? [],
+            calendarExclude: file.calendar?.exclude ?? []
         )
     }
 }
