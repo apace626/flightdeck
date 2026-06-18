@@ -54,7 +54,7 @@ enum Dashboard {
     PATH="$PATH:/opt/homebrew/bin:$HOME/.local/bin"
     PROJECTS_DIR="$HOME/Projects/personal"
     PORTS="3000 8080 9090 5173"
-    SYMBOLS="NVDA AAL YOLO SPCX ^GSPC ^IXIC ^DJI"
+    SYMBOLS="AAL AXON NVDA SPCX ^DJI ^GSPC ^IXIC"
 
     e=$(printf '\\033')
     dim="$e[2m"; bold="$e[1m"; cyan="$e[1;36m"; white="$e[1;37m"; ylw="$e[1;33m"; grn="$e[1;32m"; red="$e[1;31m"; rst="$e[0m"
