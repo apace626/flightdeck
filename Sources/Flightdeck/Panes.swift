@@ -22,20 +22,52 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
     /// reports it (OSC 7). Used to open splits in the same place.
     private(set) var currentDirectory: String
 
-    /// Kill this pane's entire process tree. The shell is a process-group leader
-    /// (the pty calls setsid), so killing the group (-pid) takes down make/java/etc.
-    /// — not just the shell. Prevents orphaned servers holding ports after quit.
+    /// Kill this pane's entire process tree. Kills the shell's process GROUP and
+    /// its whole DESCENDANT tree — the latter catches servers that left the
+    /// group (e.g. Maven → java in a new pgid), which a killpg alone would miss
+    /// and leave orphaned on their ports. Synchronous, so it completes on app
+    /// quit (async work wouldn't run as the process is exiting).
     func terminateProcessTree() {
         // Only signal if the shell is still alive — shellPid is NOT reset on exit,
         // so killing a dead (possibly reused) pid's group could hit siblings.
         guard terminal.process.running else { return }
         let pid = terminal.process.shellPid
         guard pid > 0 else { return }
+        let tree = Self.descendantPIDs(of: pid)
         killpg(pid, SIGTERM)
-        // Escalate to SIGKILL shortly after, only if it's still running.
-        DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            if self?.terminal.process.running == true { killpg(pid, SIGKILL) }
+        for child in tree { kill(child, SIGTERM) }
+        for child in tree { kill(child, SIGKILL) }
+        kill(pid, SIGKILL)
+        killpg(pid, SIGKILL)
+    }
+
+    /// All descendant PIDs of `root` (children, grandchildren, …) from a `ps`
+    /// snapshot. Used to kill servers that escaped the shell's process group.
+    private static func descendantPIDs(of root: pid_t) -> [pid_t] {
+        let proc = Process()
+        proc.executableURL = URL(fileURLWithPath: "/bin/ps")
+        proc.arguments = ["-axo", "pid=,ppid="]
+        let pipe = Pipe()
+        proc.standardOutput = pipe
+        proc.standardError = FileHandle.nullDevice
+        guard (try? proc.run()) != nil else { return [] }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        proc.waitUntilExit()
+
+        var childrenOf: [pid_t: [pid_t]] = [:]
+        for line in (String(data: data, encoding: .utf8) ?? "").split(separator: "\n") {
+            let nums = line.split(whereSeparator: { $0 == " " }).compactMap { pid_t($0) }
+            if nums.count == 2 { childrenOf[nums[1], default: []].append(nums[0]) }
         }
+        var result: [pid_t] = []
+        var stack = [root]
+        while let p = stack.popLast() {
+            for c in childrenOf[p, default: []] where c != root {
+                result.append(c)
+                stack.append(c)
+            }
+        }
+        return result
     }
 
     init(command: String? = nil, workingDirectory: String? = nil, extraEnv: [String: String] = [:], keepAlive: Bool = false, hideCursor: Bool = false) {
