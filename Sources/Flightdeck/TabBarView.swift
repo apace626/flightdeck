@@ -1,5 +1,10 @@
 import AppKit
 
+/// What a tab holds — drives the colored dot to the left of its name.
+enum TabKind {
+    case terminal, project, review, web, dashboard
+}
+
 /// Top tab strip. Active tab is a rounded highlight with an × close button;
 /// roomy spacing; minimalist Catppuccin styling. A trailing + opens a new tab.
 final class TabBarView: NSView {
@@ -16,6 +21,17 @@ final class TabBarView: NSView {
     private static let active  = c(49, 50, 68)    // surface0
     private static let text    = c(205, 214, 244)
     private static let dim     = c(127, 132, 156)
+
+    /// Dot color per tab kind (Catppuccin Mocha).
+    private static func dotColor(_ kind: TabKind) -> NSColor {
+        switch kind {
+        case .project:   return c(137, 180, 250)  // blue
+        case .review:    return c(203, 166, 247)  // mauve
+        case .web:       return c(166, 227, 161)  // green
+        case .dashboard: return c(250, 179, 135)  // peach
+        case .terminal:  return c(108, 112, 134)  // overlay (dim)
+        }
+    }
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -42,19 +58,27 @@ final class TabBarView: NSView {
         NSSize(width: NSView.noIntrinsicMetric, height: 42)
     }
 
-    func update(titles: [String], active: Int) {
+    func update(tabs: [(title: String, kind: TabKind)], active: Int) {
         stack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for (index, title) in titles.enumerated() {
-            stack.addArrangedSubview(makeTab(index: index, title: title, isActive: index == active))
+        for (index, tab) in tabs.enumerated() {
+            stack.addArrangedSubview(makeTab(index: index, title: tab.title, kind: tab.kind, isActive: index == active))
         }
         stack.addArrangedSubview(makePlus())
     }
 
-    private func makeTab(index: Int, title: String, isActive: Bool) -> NSView {
+    private func makeTab(index: Int, title: String, kind: TabKind, isActive: Bool) -> NSView {
         let pill = NSView()
         pill.wantsLayer = true
         pill.layer?.cornerRadius = 8
         pill.layer?.backgroundColor = (isActive ? Self.active : .clear).cgColor
+
+        // Colored kind dot.
+        let dot = NSView()
+        dot.wantsLayer = true
+        dot.layer?.cornerRadius = 4
+        dot.layer?.backgroundColor = Self.dotColor(kind).cgColor
+        dot.translatesAutoresizingMaskIntoConstraints = false
+        pill.addSubview(dot)
 
         let label = NSButton(title: title, target: self, action: #selector(tabClicked(_:)))
         label.tag = index
@@ -65,6 +89,13 @@ final class TabBarView: NSView {
 
         pill.addSubview(label)
         let trailing = label.trailingAnchor.constraint(equalTo: pill.trailingAnchor, constant: -14)
+
+        NSLayoutConstraint.activate([
+            dot.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 12),
+            dot.centerYAnchor.constraint(equalTo: pill.centerYAnchor),
+            dot.widthAnchor.constraint(equalToConstant: 8),
+            dot.heightAnchor.constraint(equalToConstant: 8),
+        ])
 
         if isActive {
             let close = NSButton(title: "×", target: self, action: #selector(closeClicked(_:)))
@@ -85,7 +116,7 @@ final class TabBarView: NSView {
         }
 
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: pill.leadingAnchor, constant: 14),
+            label.leadingAnchor.constraint(equalTo: dot.trailingAnchor, constant: 7),
             label.topAnchor.constraint(equalTo: pill.topAnchor, constant: 5),
             label.bottomAnchor.constraint(equalTo: pill.bottomAnchor, constant: -5),
         ])

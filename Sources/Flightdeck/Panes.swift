@@ -18,6 +18,9 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
     let terminal: LocalProcessTerminalView
     var onExit: ((TerminalPane) -> Void)?
     var onTitle: ((String) -> Void)?
+    /// Tracks the pane's directory: its launch dir, updated live if the shell
+    /// reports it (OSC 7). Used to open splits in the same place.
+    private(set) var currentDirectory: String
 
     /// Kill this pane's entire process tree. The shell is a process-group leader
     /// (the pty calls setsid), so killing the group (-pid) takes down make/java/etc.
@@ -36,6 +39,7 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
     }
 
     init(command: String? = nil, workingDirectory: String? = nil, extraEnv: [String: String] = [:], keepAlive: Bool = false, hideCursor: Bool = false) {
+        currentDirectory = (workingDirectory as NSString?)?.expandingTildeInPath ?? NSHomeDirectory()
         terminal = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         super.init(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
 
@@ -120,7 +124,11 @@ final class TerminalPane: PaneView, LocalProcessTerminalViewDelegate {
         onTitle?(title)
     }
 
-    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {}
+    func hostCurrentDirectoryUpdate(source: TerminalView, directory: String?) {
+        guard var d = directory, !d.isEmpty else { return }
+        if let url = URL(string: d), url.isFileURL { d = url.path }  // OSC 7 sends file://host/path
+        currentDirectory = d
+    }
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         onExit?(self)

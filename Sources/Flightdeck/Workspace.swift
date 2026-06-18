@@ -238,23 +238,46 @@ final class Workspace: NSView {
     // MARK: - Split / close
 
     /// Split the focused pane. `vertical: true` = side-by-side (vertical divider).
-    func splitFocused(vertical: Bool) {
+    func splitFocused(vertical: Bool, command: String? = nil) {
         guard let pane = focusedPane() else { return }
-        let newPane = TerminalPane()
+        // New pane inherits the focused pane's directory (so a codex/review split
+        // opens "here"). keepAlive when running a command so quitting it drops to
+        // a shell rather than closing the pane.
+        let cwd = (pane as? TerminalPane)?.currentDirectory
+        let newPane = TerminalPane(command: command, workingDirectory: cwd, keepAlive: command != nil)
         hook(newPane)
+
+        // Capture the PARENT split's divider positions: swapping `pane` for a new
+        // sub-split makes NSSplitView redistribute the parent (shoving e.g. the
+        // claude | diff divider over), so we restore them after.
+        let parentSplit = pane.superview as? NSSplitView
+        let savedDividers: [CGFloat] = parentSplit.map { ps in
+            guard ps.arrangedSubviews.count >= 2 else { return [] }
+            return (0..<(ps.arrangedSubviews.count - 1)).map { i in
+                ps.isVertical ? ps.arrangedSubviews[i].frame.maxX : ps.arrangedSubviews[i].frame.maxY
+            }
+        } ?? []
 
         let split = PaneSplitView()
         split.isVertical = vertical
         split.dividerStyle = .thin
+        // Apply 50/50 on the split's FIRST real layout (same mechanism the static
+        // layouts use). The old `setPosition(bounds/2)` ran before the split was
+        // sized, so bounds was 0 → one pane collapsed to nothing.
+        split.desiredRatios = [0.5, 0.5]
 
         replaceInParent(pane, with: split)
         split.addArrangedSubview(pane)
         split.addArrangedSubview(newPane)
 
-        // Even 50/50 once the split view has its real size.
-        DispatchQueue.main.async {
-            let total = vertical ? split.bounds.width : split.bounds.height
-            split.setPosition(total / 2, ofDividerAt: 0)
+        // Once layout settles: restore the parent's dividers (so the existing
+        // panes don't move), repaint the reparented pane, focus the new one.
+        DispatchQueue.main.async { [weak self] in
+            self?.layoutSubtreeIfNeeded()
+            if let ps = parentSplit {
+                for (i, pos) in savedDividers.enumerated() { ps.setPosition(pos, ofDividerAt: i) }
+            }
+            (pane as? TerminalPane)?.terminal.needsDisplay = true
             newPane.takeFocus()
         }
     }

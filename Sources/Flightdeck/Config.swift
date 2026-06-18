@@ -229,13 +229,6 @@ title = "Git"
 command = "lg"
 key = "g"
 
-[destinations.review]
-# Pick a repo → code-review tab: codex (left) + lazygit (right).
-type = "terminal"
-title = "Review"
-command = "cr"
-key = "v"
-
 [destinations.localhost]
 # Prompts for a port, then opens http://localhost:<port> in a tab named ":<port>".
 type = "localhost"

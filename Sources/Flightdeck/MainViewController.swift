@@ -6,12 +6,14 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         var title: String
         let destination: String? // nil = anonymous terminal tab
         let workspace: Workspace
+        let kind: TabKind        // drives the colored dot in the tab bar
         var pinnedTitle = false  // manually renamed → don't auto-retitle from shell
 
-        init(title: String, destination: String?, workspace: Workspace) {
+        init(title: String, destination: String?, workspace: Workspace, kind: TabKind = .terminal) {
             self.title = title
             self.destination = destination
             self.workspace = workspace
+            self.kind = kind
         }
     }
 
@@ -63,6 +65,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             FileHandle.standardError.write(Data("flightdeck: \(warning)\n".utf8))
         }
         FilesBrowser.ensure()  // install ff / lg / fd-open helpers on PATH
+        GitDiff.start()        // local diff server for project diff panes
         Reminders.start()      // Reminders access + dashboard snapshot feed
         CalendarEvents.start(include: config.calendarInclude)  // agenda snapshot feed
 
@@ -171,6 +174,8 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             activeWorkspace?.splitFocused(vertical: true)
         case .splitDown:
             activeWorkspace?.splitFocused(vertical: false)
+        case .splitCodex:
+            activeWorkspace?.splitFocused(vertical: false, command: "codex")
         case .focus(let direction):
             activeWorkspace?.focusNeighbor(direction)
         case .closePane:
@@ -246,7 +251,13 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             return   // handled above via promptLocalhost()
         }
         workspace.delegate = self
-        tabs.append(Tab(title: dest.title, destination: name, workspace: workspace))
+        let tabKind: TabKind
+        switch dest.kind {
+        case .dashboard:        tabKind = .dashboard
+        case .web:              tabKind = .web
+        case .files, .terminal, .localhost: tabKind = .terminal
+        }
+        tabs.append(Tab(title: dest.title, destination: name, workspace: workspace, kind: tabKind))
         if select {
             selectTab(tabs.count - 1)
         } else {
@@ -277,6 +288,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
 
     /// Kill all panes' process trees across every tab (called on app quit).
     func terminateAllProcesses() {
+        GitDiff.stop()
         tabs.forEach { $0.workspace.terminateAll() }
     }
 
@@ -293,7 +305,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     }
 
     private func refreshTabBar() {
-        tabBar.update(titles: tabs.map(\.title), active: activeIndex)
+        tabBar.update(tabs: tabs.map { ($0.title, $0.kind) }, active: activeIndex)
     }
 
     private func toggleZen() {
@@ -461,7 +473,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         workspace.delegate = self
         // Pin the title — otherwise codex/lazygit's terminal-title escapes would
         // overwrite "(review)" via paneTitleChanged (destination is nil here).
-        let tab = Tab(title: "\(name) (review)", destination: nil, workspace: workspace)
+        let tab = Tab(title: "\(name) (review)", destination: nil, workspace: workspace, kind: .review)
         tab.pinnedTitle = true
         tabs.append(tab)
         selectTab(tabs.count - 1)
@@ -501,7 +513,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     func openWebTab(title: String, url: URL) {
         let workspace = Workspace(initialPane: WebPane(url: url))
         workspace.delegate = self
-        tabs.append(Tab(title: title, destination: nil, workspace: workspace))
+        tabs.append(Tab(title: title, destination: nil, workspace: workspace, kind: .web))
         selectTab(tabs.count - 1)
     }
 
@@ -517,7 +529,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         let statusBar = project.statusbar.map { (command: $0, cwd: project.root) }
         let workspace = Workspace(spec: project.layout, statusBar: statusBar)
         workspace.delegate = self
-        tabs.append(Tab(title: project.name, destination: name, workspace: workspace))
+        tabs.append(Tab(title: project.name, destination: name, workspace: workspace, kind: .project))
         if select { selectTab(tabs.count - 1) } else { refreshTabBar() }
     }
 
@@ -545,6 +557,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             .init(id: "act:rename", title: "Rename Tab",       subtitle: "current tab",       keyHint: nil),
             .init(id: "act:splitr", title: "Split Right",      subtitle: "pane",              keyHint: nil),
             .init(id: "act:splitd", title: "Split Down",       subtitle: "pane",              keyHint: nil),
+            .init(id: "act:codex",  title: "Review",            subtitle: "split pane down · codex here", keyHint: nil),
             .init(id: "act:close",  title: "Close Pane",       subtitle: "",                  keyHint: nil),
             .init(id: "act:zen",    title: "Zen Mode",         subtitle: "fullscreen",        keyHint: nil),
             .init(id: "act:mic",    title: "Dictate",          subtitle: "voice → text",      keyHint: nil),
@@ -567,6 +580,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
         case "act:rename": perform(.renameTab)
         case "act:splitr": perform(.splitRight)
         case "act:splitd": perform(.splitDown)
+        case "act:codex":  perform(.splitCodex)
         case "act:close":  perform(.closePane)
         case "act:zen":    perform(.toggleZen)
         case "act:mic":    perform(.toggleMic)

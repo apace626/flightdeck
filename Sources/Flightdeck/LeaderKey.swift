@@ -9,6 +9,7 @@ enum LeaderAction {
     case goto(String)          // destination or project name
     case splitRight
     case splitDown
+    case splitCodex            // split + run codex in the focused pane's dir
     case focus(Direction)
     case closePane
     case selectTab(Int)
