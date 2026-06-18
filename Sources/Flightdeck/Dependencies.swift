@@ -17,7 +17,6 @@ enum Dependencies {
         Tool(name: "fd",      purpose: "fast file listing",                  formula: "fd",      required: false),
         Tool(name: "bat",     purpose: "syntax-highlighted previews",        formula: "bat",     required: false),
         Tool(name: "pandoc",  purpose: "markdown preview (ff Ctrl-G)",       formula: "pandoc",  required: false),
-        Tool(name: "lazygit", purpose: "Git diff browser",                   formula: "lazygit", required: false),
         Tool(name: "curl",    purpose: "dashboard weather / IP",             formula: "curl",    required: false),
         Tool(name: "python3", purpose: "dashboard stocks",                   formula: "python",  required: false),
     ]

@@ -452,31 +452,9 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             Reminders.add(parts[1...].joined(separator: " ")) { [weak self] message in
                 self?.showToast(message)
             }
-        case "review" where parts.count >= 2:
-            openReviewTab(cwd: parts[1])
         default:
             break
         }
-    }
-
-    /// Open a code-review tab for a repo: codex (left) + lazygit (right), each
-    /// in the repo dir. keepAlive so quitting either drops to a shell there
-    /// rather than closing the pane. Used by the control socket (the `cr` picker).
-    func openReviewTab(cwd: String) {
-        let dir = (cwd as NSString).expandingTildeInPath
-        let name = (dir as NSString).lastPathComponent
-        let spec = PaneSpec.split(vertical: true, ratios: [1.0 / 3.0, 2.0 / 3.0], children: [
-            .terminal(command: "codex", cwd: dir, keepAlive: true),
-            .terminal(command: "lazygit", cwd: dir, keepAlive: true),
-        ])
-        let workspace = Workspace(spec: spec)
-        workspace.delegate = self
-        // Pin the title — otherwise codex/lazygit's terminal-title escapes would
-        // overwrite "(review)" via paneTitleChanged (destination is nil here).
-        let tab = Tab(title: "\(name) (review)", destination: nil, workspace: workspace, kind: .review)
-        tab.pinnedTitle = true
-        tabs.append(tab)
-        selectTab(tabs.count - 1)
     }
 
     /// Open a new tab running an arbitrary command (used by the control socket).

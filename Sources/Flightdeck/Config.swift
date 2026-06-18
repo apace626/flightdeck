@@ -222,13 +222,6 @@ title = "Journal"
 command = "f=~/sync/braindump/journal.md; h=$(date '+## %A, %B %-d, %Y'); grep -qF \"$h\" \"$f\" 2>/dev/null || printf '\\n%s\\n\\n' \"$h\" >> \"$f\"; nvim + \"$f\""
 key = "j"
 
-[destinations.git]
-# Pick a repo (preview shows what changed) → browse diffs in lazygit.
-type = "terminal"
-title = "Git"
-command = "lg"
-key = "g"
-
 [destinations.localhost]
 # Prompts for a port, then opens http://localhost:<port> in a tab named ":<port>".
 type = "localhost"
