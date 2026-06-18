@@ -535,7 +535,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
             .init(id: "act:rename", title: "Rename Tab",       subtitle: "current tab",       keyHint: nil),
             .init(id: "act:splitr", title: "Split Right",      subtitle: "pane",              keyHint: nil),
             .init(id: "act:splitd", title: "Split Down",       subtitle: "pane",              keyHint: nil),
-            .init(id: "act:codex",  title: "Review",            subtitle: "split pane down · codex here", keyHint: nil),
+            .init(id: "act:codex",  title: "Codex",             subtitle: "split pane down · codex here", keyHint: nil),
             .init(id: "act:close",  title: "Close Pane",       subtitle: "",                  keyHint: nil),
             .init(id: "act:zen",    title: "Zen Mode",         subtitle: "fullscreen",        keyHint: nil),
             .init(id: "act:mic",    title: "Dictate",          subtitle: "voice → text",      keyHint: nil),
