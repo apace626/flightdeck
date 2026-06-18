@@ -77,11 +77,14 @@ enum GitDiff {
                  : (x === 'R') ? 'R' : 'M';
         return { path: p, status: st };
       });
+      const home = os.homedir();
+      const dir = repo.startsWith(home) ? '~' + repo.slice(home.length) : repo;
       return {
         branch: branch || '(detached)',
         ahead: parseInt(ahead || '0', 10) || 0,
         behind: parseInt(behind || '0', 10) || 0,
         last: last,
+        dir: dir,
         files: files,
       };
     }
@@ -114,14 +117,17 @@ enum GitDiff {
       *{box-sizing:border-box}
       html,body{margin:0;background:#1e1e2e;color:#cdd6f4;font:13px/1.5 -apple-system,system-ui,sans-serif}
       #head{position:sticky;top:0;background:#1e1e2e;border-bottom:1px solid #313244;padding:11px 16px;z-index:5}
-      #toprow{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-      #count{color:#cba6f7;font-weight:600;font-size:12px;letter-spacing:.03em;flex:none}
-      #info{display:flex;gap:10px;align-items:baseline;font-size:11.5px;white-space:nowrap;overflow:hidden}
+      #toprow{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+      .hcol{display:flex;flex-direction:column;min-width:0}
+      .hright{align-items:flex-end}
+      #count{color:#cba6f7;font-weight:600;font-size:12px;letter-spacing:.03em}
+      #info{display:flex;gap:10px;align-items:baseline;justify-content:flex-end;font-size:11.5px;white-space:nowrap;overflow:hidden}
       #info .br{color:#89b4fa;font-weight:600}
       #info .bicon{font-family:"JetBrainsMono Nerd Font","Symbols Nerd Font",monospace;font-weight:400;margin-right:2px}
       #info .ab{color:#f9e2af}
       #info .last{color:#6c7086;overflow:hidden;text-overflow:ellipsis}
-      #hint{color:#585b70;font-size:11px;margin-top:4px}
+      #dir{color:#7f849c;font-size:11px;margin-top:3px;font-family:ui-monospace,"SF Mono",monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+      #hint{color:#585b70;font-size:11px;margin-top:3px}
       .file{display:flex;align-items:center;gap:8px;padding:7px 16px;cursor:pointer;white-space:nowrap;border-left:2px solid transparent}
       .file:hover{background:#26263a}
       .file.sel{border-left-color:#cba6f7}
@@ -140,8 +146,10 @@ enum GitDiff {
       .empty{color:#6c7086;padding:30px 16px}
     </style></head><body>
     <div id="head">
-      <div id="toprow"><div id="count">…</div><div id="info"></div></div>
-      <div id="hint">↑↓ / j k to move · enter or click to expand</div>
+      <div id="toprow">
+        <div class="hcol"><div id="count">…</div><div id="hint">↑↓ / j k to move · enter or click to expand</div></div>
+        <div class="hcol hright"><div id="info"></div><div id="dir"></div></div>
+      </div>
     </div>
     <div id="list"></div>
     <script>
@@ -211,6 +219,7 @@ enum GitDiff {
         if(s.ahead||s.behind) parts.push('<span class="ab">↑'+s.ahead+' ↓'+s.behind+'</span>');
         if(s.last) parts.push('<span class="last">Last Commit: '+esc(s.last)+'</span>');
         document.getElementById("info").innerHTML = parts.join("");
+        document.getElementById("dir").textContent = s.dir || "";
       }
 
       function poll(){
