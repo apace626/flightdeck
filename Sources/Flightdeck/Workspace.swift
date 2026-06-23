@@ -220,19 +220,41 @@ final class Workspace: NSView {
         return result
     }
 
+    private weak var lastFocusedPane: PaneView?
+
     func focusedPane() -> PaneView? {
         var responder = window?.firstResponder as? NSView
         while let view = responder {
             if let pane = view as? PaneView, pane.isDescendant(of: self) {
+                lastFocusedPane = pane          // remember the real focused pane
                 return pane
             }
             responder = view.superview
         }
+        // First responder isn't one of our panes — e.g. the launcher overlay
+        // grabbed it. Fall back to the pane that was last actually focused, so a
+        // split/codex action opened from the launcher acts on the pane you were
+        // in (not always the first one).
+        if let last = lastFocusedPane, last.isDescendant(of: self) { return last }
         return allPanes().first
     }
 
     func focusInitial() {
         allPanes().first?.takeFocus()
+    }
+
+    /// Re-layout and force every terminal to reflow + repaint. Used when the
+    /// window's screen or backing scale changes (laptop ↔ external monitor),
+    /// which otherwise leaves the active tab's panes stale until you switch tabs.
+    func relayoutAndRepaint() {
+        layoutSubtreeIfNeeded()
+        for case let term as TerminalPane in allPanes() {
+            let tv = term.terminal
+            let s = tv.frame.size
+            tv.setFrameSize(NSSize(width: s.width, height: max(1, s.height - 1)))
+            tv.setFrameSize(s)   // nudge → SwiftTerm reflows + SIGWINCH + repaints
+            tv.needsDisplay = true
+        }
     }
 
     // MARK: - Split / close

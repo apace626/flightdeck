@@ -22,6 +22,7 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
     private var tabs: [Tab] = []
     private var activeIndex = -1
     private var leader: LeaderController?
+    private var screenObservers: [NSObjectProtocol] = []
     private var zenMode = false
     private var config: Config!
     private var projects: [String: Project] = [:]   // keyed by name
@@ -125,6 +126,35 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
 
         maybeShowWelcome()
     }
+
+    /// Once the view is in a window, watch for screen / backing-scale changes
+    /// (moving between the laptop display and an external monitor) and force the
+    /// active tab to relayout — otherwise its panes and the tab bar stay stale
+    /// until you switch tabs.
+    override func viewDidAppear() {
+        super.viewDidAppear()
+        guard let window = view.window, screenObservers.isEmpty else { return }
+        let nc = NotificationCenter.default
+        for name in [NSWindow.didChangeScreenNotification, NSWindow.didChangeBackingPropertiesNotification] {
+            screenObservers.append(nc.addObserver(forName: name, object: window, queue: .main) { [weak self] _ in
+                self?.relayoutActiveTab()
+            })
+        }
+    }
+
+    private func relayoutActiveTab() {
+        guard tabs.indices.contains(activeIndex) else { return }
+        // A beat after the screen settles, force a full relayout (same effect as
+        // switching tabs, which is the known workaround).
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.view.layoutSubtreeIfNeeded()
+            self.refreshTabBar()
+            self.tabs[self.activeIndex].workspace.relayoutAndRepaint()
+        }
+    }
+
+    deinit { screenObservers.forEach(NotificationCenter.default.removeObserver) }
 
     // MARK: - First-run welcome / dependency check
 
@@ -515,6 +545,9 @@ final class MainViewController: NSViewController, WorkspaceDelegate {
 
     private func showLauncher() {
         guard !view.subviews.contains(where: { $0 is ListPicker }) else { return }
+        // Cache the active pane NOW, before the launcher overlay steals focus, so
+        // a split/codex action picked from the launcher targets the right pane.
+        _ = activeWorkspace?.focusedPane()
         var items: [ListPicker.Item] = []
 
         // Destinations (config order) — the "apps" you go to.
