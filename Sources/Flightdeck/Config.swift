@@ -242,4 +242,10 @@ type = "web"
 title = "Trello"
 url = "https://trello.com"
 key = "r"
+
+[destinations.digitalocean]
+type = "web"
+title = "Digital Ocean"
+url = "https://cloud.digitalocean.com"
+key = "o"
 """
