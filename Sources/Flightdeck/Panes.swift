@@ -202,6 +202,25 @@ final class WebPane: PaneView, WKNavigationDelegate {
 
     required init?(coder: NSCoder) { fatalError("init(coder:) is not supported") }
 
+    // Accept self-signed / untrusted certs for LOOPBACK hosts only — i.e. your
+    // own dev server on https://localhost. WKWebView otherwise silently rejects
+    // them and shows a blank page (Firefox lets you click through the warning).
+    // Real remote hosts still get default cert validation.
+    func webView(_ webView: WKWebView, didReceive challenge: URLAuthenticationChallenge,
+                 completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.performDefaultHandling, nil); return
+        }
+        let host = challenge.protectionSpace.host
+        let isLoopback = host == "localhost" || host == "127.0.0.1" || host == "::1" || host.hasSuffix(".local")
+        if isLoopback {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
+    }
+
     // Surface load failures instead of showing a silent white screen — a
     // blocked cleartext load (ATS) or a dead server otherwise looks identical
     // to a blank page.
